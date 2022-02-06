@@ -1,0 +1,27 @@
+[package]
+authors = ["Systemcluster <me@systemcluster.me>"]
+description = "Word Counter and Text Statistics"
+edition = "2021"
+name = "wordstat"
+version = "0.1.0"
+
+[[bin]]
+name = "wordstat"
+path = "src/main_cli.rs"
+
+[dependencies]
+
+bumpalo = {version = "3"}
+byteorder = {version = "1"}
+clap = {version = "3", features = ["std", "color", "suggestions", "derive", "env", "regex", "unicode", "wrap_help"]}
+console = {version = "0.15"}
+entangled = {version = "1"}
+futures = {version = "0.3"}
+indicatif = {version = "0.17.0-rc.2"}
+num_cpus = {version = "1"}
+parking_lot = {version = "0.12"}
+pathdiff = {version = "0.2"}
+rayon = {version = "1"}
+unicode-segmentation = {version = "1"}
+walkdir = {version = "2"}
+wild = {version = "2.1.0-alpha.2"}
