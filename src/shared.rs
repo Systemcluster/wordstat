@@ -4,7 +4,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use console::{style, Emoji};
 use dashmap::DashMap;
 use entangled::{ThreadPool, ThreadPoolDescriptor};
 use futures::{executor::block_on, future::join_all};
@@ -134,7 +133,7 @@ pub fn analyze<
                 walk.into_iter()
                     .filter_map(|path| {
                         path.map_err(|error| {
-                            on_message(format!("{}{}", Emoji("⚠️ ", ""), style(&error).red()));
+                            on_message(format!("{}", error));
                             error
                         })
                         .map_or(None, |path| {
@@ -170,16 +169,11 @@ pub fn analyze<
     for analysis in analyses.iter() {
         if let Err((path, error)) = analysis {
             on_error(format!(
-                "{}{}: {}",
-                Emoji("⚠️ ", ""),
-                style(&format!(
-                    "Failed to analyze {}:",
-                    diff_paths(&path, &pwd)
-                        .unwrap_or_else(|| path.to_owned())
-                        .display()
-                ))
-                .red(),
-                style(&error).red()
+                "Failed to analyze {}: {}",
+                diff_paths(&path, &pwd)
+                    .unwrap_or_else(|| path.to_owned())
+                    .display(),
+                error
             ));
             continue;
         }

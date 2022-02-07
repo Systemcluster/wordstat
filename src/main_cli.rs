@@ -192,7 +192,7 @@ fn main() {
             .collect(),
         &args,
         &pwd,
-        |error| eprintln!("{}", error),
+        |error| eprintln!("{}{}", Emoji("⚠️ ", ""), style(&error).red()),
         |message| bar_progress.println(message),
         |message| bar_progress.set_message(message),
         |delta| bar_progress.inc(delta),
