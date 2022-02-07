@@ -1,18 +1,21 @@
 use std::{
+    hash::BuildHasherDefault,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
 use console::{style, Emoji};
+use dashmap::DashMap;
 use entangled::{ThreadPool, ThreadPoolDescriptor};
-use futures::executor::block_on;
-use futures::future::join_all;
+use futures::{executor::block_on, future::join_all};
 use pathdiff::diff_paths;
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
+};
 use unicode_segmentation::UnicodeSegmentation;
 use walkdir::WalkDir;
 
-use crate::uhash::IdentityHashMap;
+use crate::uhash::IdentityHasher;
 use crate::ustring::UniqueString;
 
 #[derive(Default, Debug, Clone)]
@@ -23,7 +26,7 @@ pub struct Analysis {
     pub sent_count: usize,
     pub para_count: usize,
     pub word_freq: Vec<(usize, UniqueString)>,
-    pub word_freq_map: IdentityHashMap<UniqueString, usize>,
+    pub word_freq_map: DashMap<UniqueString, usize, BuildHasherDefault<IdentityHasher>>,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -56,19 +59,29 @@ async fn process(
         ..Default::default()
     };
 
-    let mut map = IdentityHashMap::<UniqueString, usize>::default();
-    for word in content.unicode_words().map(|word| {
-        if lowercase {
-            UniqueString::from(word.to_lowercase())
-        } else {
-            UniqueString::from(word)
-        }
-    }) {
-        analysis.word_count += 1;
-        map.entry(word).and_modify(|num| *num += 1).or_insert(1);
-    }
-    map.iter()
-        .for_each(|(path, count)| analysis.word_freq.push((*count, *path)));
+    let map = DashMap::default();
+    let words = content.unicode_words().collect::<Vec<_>>();
+    analysis.word_count = words
+        .par_iter()
+        .chunks(12500)
+        .map(|words| {
+            let len = words.len();
+            for &word in words {
+                map.entry(if lowercase {
+                    UniqueString::from(word.to_lowercase())
+                } else {
+                    UniqueString::from(word)
+                })
+                .and_modify(|num| *num += 1)
+                .or_insert(1);
+            }
+            len
+        })
+        .sum();
+    map.iter().for_each(|item| {
+        let (word, count) = (item.key(), item.value());
+        analysis.word_freq.push((*count, *word))
+    });
     analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
     analysis.word_freq_map = map;
 
@@ -177,7 +190,8 @@ pub fn analyze<
             total.sent_count += analysis.sent_count;
             total.char_count += analysis.char_count;
             total.para_count += analysis.para_count;
-            for (word, count) in &analysis.word_freq_map {
+            for item in analysis.word_freq_map.iter() {
+                let (word, count) = (item.key(), item.value());
                 total
                     .word_freq_map
                     .entry(*word)

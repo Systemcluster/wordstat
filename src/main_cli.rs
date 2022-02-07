@@ -85,7 +85,7 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
             style(string).green(),
         );
     }
-    if bottom_words > 0 && top_words != 0 {
+    if bottom_words > 0 && top_words != 0 && top_words < analysis.word_count {
         println!("  ...");
         for (i, (freq, string)) in analysis.word_freq.iter().rev().enumerate() {
             if bottom_words > 0 && i >= bottom_words {
@@ -223,10 +223,10 @@ fn main() {
 
     let mut analysis = total;
     if analyses_count > 1 {
-        analysis
-            .word_freq_map
-            .iter()
-            .for_each(|(path, count)| analysis.word_freq.push((*count, *path)));
+        analysis.word_freq_map.iter().for_each(|item| {
+            let (word, count) = (item.key(), item.value());
+            analysis.word_freq.push((*count, *word));
+        });
         analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
 
         println!();

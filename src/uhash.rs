@@ -5,7 +5,7 @@ use std::hash::{BuildHasherDefault, Hasher};
 
 use byteorder::{ByteOrder, NativeEndian};
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct IdentityHasher {
     hash: u64,
 }
