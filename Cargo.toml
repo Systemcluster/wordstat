@@ -18,6 +18,11 @@ name = "wordstat-gui"
 path = "src/main_gui.rs"
 required-features = ["gui"]
 
+[[bench]]
+harness = false
+name = "wordstat-bench"
+path = "benches/bench.rs"
+
 [profile.release]
 codegen-units = 1
 debug = false
@@ -27,6 +32,14 @@ lto = "fat"
 opt-level = 3
 panic = "unwind"
 strip = "symbols"
+
+[profile.bench]
+codegen-units = 1
+debug = false
+debug-assertions = false
+incremental = false
+lto = "fat"
+opt-level = 3
 
 [dependencies]
 
@@ -71,3 +84,6 @@ gui = ["native-windows-gui", "native-windows-derive", "flume", "winapi"]
 
 [build-dependencies]
 winres = {version = "0.1"}
+
+[dev-dependencies]
+glassbench = "0.3"
