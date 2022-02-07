@@ -1,5 +1,6 @@
 [package]
 authors = ["Systemcluster <me@systemcluster.me>"]
+build = "build.rs"
 description = "Word Counter and Text Statistics"
 edition = "2021"
 name = "wordstat"
@@ -9,6 +10,11 @@ version = "0.1.0"
 name = "wordstat"
 path = "src/main_cli.rs"
 
+[[bin]]
+name = "wordstat-gui"
+path = "src/main_gui.rs"
+required-features = ["gui"]
+
 [dependencies]
 
 bumpalo = {version = "3"}
@@ -16,6 +22,7 @@ byteorder = {version = "1"}
 clap = {version = "3", features = ["std", "color", "suggestions", "derive", "env", "regex", "unicode", "wrap_help"]}
 console = {version = "0.15"}
 entangled = {version = "1"}
+flume = {version = "0.10"}
 futures = {version = "0.3"}
 indicatif = {version = "0.17.0-rc.2"}
 num_cpus = {version = "1"}
@@ -25,3 +32,12 @@ rayon = {version = "1"}
 unicode-segmentation = {version = "1"}
 walkdir = {version = "2"}
 wild = {version = "2.1.0-alpha.2"}
+
+native-windows-derive = {version = "1", optional = true}
+native-windows-gui = {version = "1", optional = true, default-features = false, features = ["all"]}
+
+[features]
+gui = ["native-windows-gui", "native-windows-derive"]
+
+[build-dependencies]
+winres = {version = "0.1"}

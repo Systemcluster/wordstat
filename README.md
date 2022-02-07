@@ -4,15 +4,17 @@ Simple tool to quickly count the frequency of words in a file or collection of f
 
 ## Usage
 
+### CLI
+
 Running wordstat requires specifying the path to an input file or directory with files to process.
 
-### Example
+#### Example
 
 ```shell
 wordstat --outfile stats.txt examples
 ```
 
-### Details
+#### Details
 
 ```shell
 wordstat.exe [OPTIONS] [PATH]...
@@ -30,6 +32,10 @@ OPTIONS:
     -t, --top-words <TOP_WORDS>          Number of top words to show (0 = all) [default: 10]
     -V, --version                        Print version information
 ```
+
+### GUI
+
+![GUI](./resources/gui.png)
 
 ## Download
 

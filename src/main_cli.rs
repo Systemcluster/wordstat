@@ -19,7 +19,7 @@ use console::{style, Emoji};
 use indicatif::{ProgressBar, ProgressStyle};
 use pathdiff::diff_paths;
 
-use crate::shared::{analyze, Analysis, Args};
+use crate::shared::{analyze, Analysis, AnalyzeSource, Args};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -171,7 +171,10 @@ fn main() {
     };
 
     let (analyses, total) = analyze(
-        &paths,
+        &paths
+            .iter()
+            .map(|path| AnalyzeSource::Path(path.to_owned()))
+            .collect(),
         &args,
         &pwd,
         |error| eprintln!("{}", error),
@@ -189,9 +192,14 @@ fn main() {
             "{}File: {}",
             Emoji("📁 ", ""),
             style(
-                diff_paths(analysis.file.as_ref().unwrap(), &pwd)
-                    .unwrap_or_else(|| analysis.file.as_ref().unwrap().clone())
-                    .display()
+                analysis
+                    .file
+                    .as_ref()
+                    .map(|file| diff_paths(file, &pwd)
+                        .unwrap_or_else(|| file.clone())
+                        .display()
+                        .to_string())
+                    .unwrap_or_else(|| "<none>".to_string())
             )
             .blue()
         );

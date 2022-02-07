@@ -33,10 +33,20 @@ pub struct Args {
     pub outfile: Option<String>,
 }
 
-async fn process(path: PathBuf, lowercase: bool) -> Result<Analysis, (PathBuf, std::io::Error)> {
-    let content = std::fs::read_to_string(&path).map_err(|error| (path.clone(), error))?;
+async fn process(
+    source: AnalyzeSource,
+    lowercase: bool,
+) -> Result<Analysis, (PathBuf, std::io::Error)> {
+    let (content, file) = match source {
+        AnalyzeSource::Content(content) => (content, None),
+        AnalyzeSource::Path(path) => (
+            std::fs::read_to_string(&path).map_err(|error| (path.clone(), error))?,
+            Some(path),
+        ),
+    };
+
     let mut analysis = Analysis {
-        file: Some(path),
+        file,
         ..Default::default()
     };
 
@@ -59,13 +69,19 @@ async fn process(path: PathBuf, lowercase: bool) -> Result<Analysis, (PathBuf, s
     Ok(analysis)
 }
 
+#[allow(dead_code)]
+pub enum AnalyzeSource {
+    Content(String),
+    Path(PathBuf),
+}
+
 pub fn analyze<
     E: Fn(String) + Sync + Send,
     P: Fn(String) + Sync + Send,
     M: Fn(String) + Sync + Send,
     I: Fn(u64) + Sync + Send,
 >(
-    paths: &Vec<PathBuf>,
+    sources: &Vec<AnalyzeSource>,
     args: &Args,
     pwd: &Path,
     on_error: E,
@@ -83,38 +99,48 @@ pub fn analyze<
     });
     let tasks = Arc::new(Mutex::new(Vec::new()));
 
-    paths.par_iter().for_each(|path| {
-        let walk = WalkDir::new(path)
-            .follow_links(args.follow_symlinks)
-            .max_depth(if args.recursive { std::usize::MAX } else { 1 })
-            .sort_by_file_name();
-        walk.into_iter()
-            .filter_map(|path| {
-                path.map_err(|error| {
-                    on_message(format!("{}{}", Emoji("⚠️ ", ""), style(&error).red()));
-                    error
-                })
-                .map_or(None, |path| {
-                    if path.file_type().is_file() {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-            })
-            .par_bridge()
-            .for_each(|file| {
-                on_progress(format!(
-                    "Analyzing {}",
-                    diff_paths(file.path(), &pwd)
-                        .unwrap_or_else(|| file.path().to_owned())
-                        .display()
-                ));
-                tasks
-                    .lock()
-                    .unwrap()
-                    .push(pool.spawn(process(file.path().to_owned(), args.lowercase)));
-            });
+    sources.par_iter().for_each(|source| {
+        match source {
+            AnalyzeSource::Content(content) => {
+                tasks.lock().unwrap().push(pool.spawn(process(
+                    AnalyzeSource::Content(content.to_owned()),
+                    args.lowercase,
+                )));
+            }
+            AnalyzeSource::Path(path) => {
+                let walk = WalkDir::new(path)
+                    .follow_links(args.follow_symlinks)
+                    .max_depth(if args.recursive { std::usize::MAX } else { 1 })
+                    .sort_by_file_name();
+                walk.into_iter()
+                    .filter_map(|path| {
+                        path.map_err(|error| {
+                            on_message(format!("{}{}", Emoji("⚠️ ", ""), style(&error).red()));
+                            error
+                        })
+                        .map_or(None, |path| {
+                            if path.file_type().is_file() {
+                                Some(path)
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                    .par_bridge()
+                    .for_each(|file| {
+                        on_progress(format!(
+                            "Analyzing {}",
+                            diff_paths(file.path(), &pwd)
+                                .unwrap_or_else(|| file.path().to_owned())
+                                .display()
+                        ));
+                        tasks.lock().unwrap().push(pool.spawn(process(
+                            AnalyzeSource::Path(file.path().to_owned()),
+                            args.lowercase,
+                        )));
+                    });
+            }
+        }
         on_increment(1);
     });
 
