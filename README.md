@@ -42,3 +42,9 @@ OPTIONS:
 ## Download
 
 A build of the latest version can be found on the [release page](https://github.com/Systemcluster/wordstat/releases).
+
+Alternatively it can be installed with `cargo`:
+
+```shell
+cargo +nightly install --git https://github.com/Systemcluster/wordstat.git --bin wordstat
+```
