@@ -1,3 +1,5 @@
+cargo-features = ["strip"]
+
 [package]
 authors = ["Systemcluster <me@systemcluster.me>"]
 build = "build.rs"
@@ -14,6 +16,16 @@ path = "src/main_cli.rs"
 name = "wordstat-gui"
 path = "src/main_gui.rs"
 required-features = ["gui"]
+
+[profile.release]
+codegen-units = 1
+debug = false
+debug-assertions = false
+incremental = false
+lto = "fat"
+opt-level = 3
+panic = "unwind"
+strip = "symbols"
 
 [dependencies]
 

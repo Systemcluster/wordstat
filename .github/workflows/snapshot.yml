@@ -1,0 +1,73 @@
+name: Snapshot Build
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - ".github/**"
+      - "**/*.md"
+
+jobs:
+
+  snapshot:
+
+    name: Snapshot Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Install Windows Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          target: x86_64-pc-windows-msvc
+          profile: minimal
+
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Update dependencies
+        run: |
+          cargo update
+
+      - name: Setup Cargo cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Windows CLI
+        env:
+          RUSTFLAGS: "-Ctarget-feature=+crt-static,+mmx,+sse,+sse2,+sse3,+ssse3,+cmov,+cx8,+cx16"
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target x86_64-pc-windows-msvc --bin wordstat
+      
+      - name: Build Windows GUI
+        env:
+          RUSTFLAGS: "-Ctarget-feature=+crt-static,+mmx,+sse,+sse2,+sse3,+ssse3,+cmov,+cx8,+cx16"
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target x86_64-pc-windows-msvc --bin wordstat-gui --features gui
+
+      - name: Collect executables
+        run: |
+          mv target/x86_64-pc-windows-msvc/release/wordstat.exe wordstat.exe
+          mv target/x86_64-pc-windows-msvc/release/wordstat-gui.exe wordstat-gui.exe
+
+      - name: Upload release
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: snapshot
+          prerelease: false
+          title: Snapshot
+          files: |
+            wordstat.exe
+            wordstat-gui.exe
