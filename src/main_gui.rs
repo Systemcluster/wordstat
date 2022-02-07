@@ -101,7 +101,7 @@ pub struct App {
 
     #[nwg_control(
         readonly: true,
-        text: "Drop a file here to analyze it",
+        text: "Drop a file here to analyze it.",
         flags: "VISIBLE|VSCROLL|AUTOVSCROLL|AUTOHSCROLL",
         focus: false,
     )]
@@ -333,8 +333,9 @@ fn main() {
         .build(&mut font);
     app.text.set_font(Some(&font));
 
+    app.progress.set_state(nwg::ProgressBarState::Paused);
+
     let args = std::env::args();
-    app.text.set_text(&format!("{:?}", args));
     if args.len() > 1 {
         app.analyze(
             args.collect::<Vec<String>>()[1..]
