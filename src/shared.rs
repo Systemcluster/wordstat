@@ -19,6 +19,9 @@ use crate::ustring::UniqueString;
 pub struct Analysis {
     pub file: Option<PathBuf>,
     pub word_count: usize,
+    pub char_count: usize,
+    pub sent_count: usize,
+    pub para_count: usize,
     pub word_freq: Vec<(usize, UniqueString)>,
     pub word_freq_map: IdentityHashMap<UniqueString, usize>,
 }
@@ -47,6 +50,9 @@ async fn process(
 
     let mut analysis = Analysis {
         file,
+        sent_count: content.unicode_sentences().count(),
+        para_count: content.replace("\r\n", "\n").split("\n\n").count(),
+        char_count: content.graphemes(true).count(),
         ..Default::default()
     };
 
@@ -168,6 +174,9 @@ pub fn analyze<
 
         if let Some(total) = &mut total {
             total.word_count += analysis.word_count;
+            total.sent_count += analysis.sent_count;
+            total.char_count += analysis.char_count;
+            total.para_count += analysis.para_count;
             for (word, count) in &analysis.word_freq_map {
                 total
                     .word_freq_map

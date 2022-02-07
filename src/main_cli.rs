@@ -57,6 +57,21 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
         Emoji("🔢 ", ""),
         style(&format!("{}", analysis.word_count)).blue()
     );
+    println!(
+        "{}Sentence count: {}",
+        Emoji("🔢 ", ""),
+        style(&format!("{}", analysis.sent_count)).blue()
+    );
+    println!(
+        "{}Character count: {}",
+        Emoji("🔢 ", ""),
+        style(&format!("{}", analysis.char_count)).blue()
+    );
+    println!(
+        "{}Paragraph count: {}",
+        Emoji("🔢 ", ""),
+        style(&format!("{}", analysis.para_count)).blue()
+    );
     println!("{}Top words:", Emoji("📈 ", ""));
     for (i, (freq, string)) in analysis.word_freq.iter().enumerate() {
         if top_words > 0 && i >= top_words {

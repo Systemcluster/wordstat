@@ -240,6 +240,9 @@ impl App {
                     .unwrap_or_else(|| "<none>".to_string())
             ));
             buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+            buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+            buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+            buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
             buffer.push_str("📈 Top words:\n");
             buffer.push_str(&analysis_to_string(
                 &analysis,
@@ -258,6 +261,9 @@ impl App {
         if analyses_count > 1 {
             buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
             buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+            buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+            buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+            buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
             buffer.push_str("📈 Top words:\n");
             buffer.push_str(&analysis_to_string(
                 &analysis,
@@ -272,6 +278,9 @@ impl App {
             analyses_count
         ));
         buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+        buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+        buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+        buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
         buffer.push_str("📈 Top words:\n");
         buffer.push_str(&analysis_to_string(&analysis, 0, 0));
 

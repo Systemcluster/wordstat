@@ -6,6 +6,8 @@ Simple tool to quickly count the frequency of words in a file or collection of f
 
 ### CLI
 
+![GUI](./resources/cli.png)
+
 Running wordstat requires specifying the path to an input file or directory with files to process.
 
 #### Example
