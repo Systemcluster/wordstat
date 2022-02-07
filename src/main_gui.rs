@@ -19,7 +19,7 @@ use std::{
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
     thread::JoinHandle,
@@ -36,7 +36,11 @@ use nwg::NativeUi;
 use pathdiff::diff_paths;
 use winapi::{
     shared::windef::HWND,
-    um::wincon::{AttachConsole, FreeConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS},
+    um::{
+        shellscalingapi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
+        wincon::{AttachConsole, FreeConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS},
+        winuser::MonitorFromWindow,
+    },
 };
 
 use crate::shared::{analyze, Analysis, AnalyzeSource, Args};
@@ -107,8 +111,8 @@ pub struct App {
         layout: layout,
         align_self: AlignSelf::Stretch,
         margin: RECT_100,
-        flex_grow: 0.1,
-        min_size: Size { width: D::Auto, height: D::Points(20.0) },
+        flex_grow: 0.0,
+        min_size: Size { width: D::Auto, height: D::Points(15.0) },
     )]
     progress: nwg::ProgressBar,
 
@@ -135,8 +139,8 @@ pub struct App {
     #[nwg_layout_item(
         layout: layout,
         align_self: AlignSelf::Stretch,
-        flex_grow: 0.1,
-        min_size: Size { width: D::Auto, height: D::Points(20.0) },
+        flex_grow: 0.0,
+        min_size: Size { width: D::Auto, height: D::Points(10.0) },
     )]
     status: nwg::StatusBar,
 
@@ -150,6 +154,17 @@ pub struct App {
     )]
     timer: nwg::AnimationTimer,
 
+    #[nwg_control(
+        parent: window,
+        interval: Duration::from_millis(50),
+        max_tick: Some(1),
+        active: true,
+    )]
+    #[nwg_events(
+        OnTimerTick: [App::matchdpi(SELF)],
+    )]
+    dpitimer: nwg::AnimationTimer,
+
     tx: RefCell<Option<flume::Sender<Message>>>,
     tr: RefCell<Option<flume::Receiver<Message>>>,
     control_pressed: Arc<AtomicBool>,
@@ -158,6 +173,8 @@ pub struct App {
 
     args: RefCell<Args>,
     pwd: RefCell<PathBuf>,
+
+    dpi: Arc<AtomicU32>,
 }
 
 impl App {
@@ -166,14 +183,16 @@ impl App {
         let _ = nwg::Icon::builder().source_bin(Some(ICON)).build(&mut icon);
         self.window.set_icon(Some(&icon));
 
+        self.progress.set_state(nwg::ProgressBarState::Paused);
+
+        self.dpi.store(96, Ordering::Relaxed);
         let mut font = nwg::Font::default();
         let _ = nwg::Font::builder()
-            .size(28)
+            .size(16)
             .family("Segoe UI Emoji")
             .build(&mut font);
         self.text.set_font(Some(&font));
-
-        self.progress.set_state(nwg::ProgressBarState::Paused);
+        self.status.set_font(Some(&font));
 
         let args = std::env::args();
         if args.len() > 1 {
@@ -184,11 +203,14 @@ impl App {
                     .collect(),
             );
         }
+
+        self.matchdpi();
     }
 
     fn resize(&self, data: &nwg::EventData) {
         let data = data.on_min_max();
         data.set_min_size(820, 620);
+        self.dpitimer.start();
     }
 
     fn keypress(&self, data: &nwg::EventData) {
@@ -234,6 +256,28 @@ impl App {
                 Message::Text(message) => self.status.set_text(0, &message),
                 Message::End => self.complete_analyze(),
             };
+        }
+    }
+
+    pub fn matchdpi(&self) {
+        unsafe {
+            let dpi = self.dpi.load(Ordering::SeqCst);
+            let hwnd = self.window.handle.hwnd().unwrap();
+            let monitor = MonitorFromWindow(hwnd, 0);
+            let mut x = 0;
+            let mut y = 0;
+            let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut x, &mut y);
+            if x != dpi {
+                let ratio = x as f64 / 96.0;
+                let size = (12.0 * ratio).to_int_unchecked();
+                self.dpi.store(x, Ordering::SeqCst);
+                let mut font = nwg::Font::default();
+                let _ = nwg::Font::builder()
+                    .size(size)
+                    .family("Segoe UI Emoji")
+                    .build(&mut font);
+                self.status.set_font(Some(&font));
+            }
         }
     }
 
@@ -395,6 +439,12 @@ fn main() {
 
     nwg::init().expect("Failed to init Native Windows GUI");
     let _ = nwg::Font::set_global_family("Segoe UI");
+    let mut font = nwg::Font::default();
+    let _ = nwg::Font::builder()
+        .size(16)
+        .family("Segoe UI Emoji")
+        .build(&mut font);
+    let _ = nwg::Font::set_global_default(Some(font));
 
     let app = App::build_ui(Default::default()).expect("Failed to build UI");
     let (tx, tr) = flume::unbounded();

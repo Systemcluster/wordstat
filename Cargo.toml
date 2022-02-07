@@ -71,10 +71,12 @@ wild = {version = "2.1.0-alpha.2", optional = true}
 
 flume = {version = "0.10", optional = true}
 native-windows-derive = {version = "1", optional = true}
-native-windows-gui = {version = "1", default-features = false, features = ["all"], optional = true}
+native-windows-gui = {version = "1", default-features = false, features = ["all", "high-dpi"], optional = true}
 winapi = {version = "0.3", default-features = false, features = [
   "wincon",
   "wincontypes",
+  "winuser",
+  "shellscalingapi",
 ], optional = true}
 
 [features]
