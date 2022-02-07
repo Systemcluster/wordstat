@@ -107,7 +107,7 @@ pub fn analyze<
     on_message: M,
     on_progress: P,
     on_increment: I,
-) -> (Vec<Analysis>, Analysis) {
+) -> (Vec<Analysis>, Option<Analysis>) {
     let pool = ThreadPool::new(ThreadPoolDescriptor {
         num_threads: num_cpus::get(),
         ..Default::default()
@@ -210,5 +210,5 @@ pub fn analyze<
         .filter_map(|analysis| analysis.ok())
         .collect();
 
-    (analyses, total.unwrap())
+    (analyses, total)
 }

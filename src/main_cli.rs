@@ -221,38 +221,39 @@ fn main() {
         print_analysis(analysis, args.top_words, args.bottom_words);
     }
 
-    let mut analysis = total;
-    if analyses_count > 1 {
-        analysis.word_freq_map.iter().for_each(|item| {
-            let (word, count) = (item.key(), item.value());
-            analysis.word_freq.push((*count, *word));
-        });
-        analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
+    if let Some(mut analysis) = total {
+        if analyses_count > 1 {
+            analysis.word_freq_map.iter().for_each(|item| {
+                let (word, count) = (item.key(), item.value());
+                analysis.word_freq.push((*count, *word));
+            });
+            analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
 
-        println!();
-        println!(
-            "{}{} {} {}",
-            Emoji("📢 ", ""),
-            style("Summary of").yellow(),
-            style(&format!("{}", analyses_count)).bold().magenta(),
-            style("files").yellow()
-        );
-        print_analysis(&analysis, args.top_words, args.bottom_words);
-    }
+            println!();
+            println!(
+                "{}{} {} {}",
+                Emoji("📢 ", ""),
+                style("Summary of").yellow(),
+                style(&format!("{}", analyses_count)).bold().magenta(),
+                style("files").yellow()
+            );
+            print_analysis(&analysis, args.top_words, args.bottom_words);
+        }
 
-    if let Some(path) = args.outfile {
-        println!();
-        let outfile = PathBuf::from(&path);
-        println!(
-            "{}Writing results to {}",
-            Emoji("🖥️ ", ""),
-            style(
-                diff_paths(&outfile, &pwd)
-                    .unwrap_or_else(|| outfile.clone())
-                    .display()
-            )
-            .blue()
-        );
-        print_analysis_file(&analysis, &outfile);
+        if let Some(path) = args.outfile {
+            println!();
+            let outfile = PathBuf::from(&path);
+            println!(
+                "{}Writing results to {}",
+                Emoji("🖥️ ", ""),
+                style(
+                    diff_paths(&outfile, &pwd)
+                        .unwrap_or_else(|| outfile.clone())
+                        .display()
+                )
+                .blue()
+            );
+            print_analysis_file(&analysis, &outfile);
+        }
     }
 }

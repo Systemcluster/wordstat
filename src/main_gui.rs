@@ -154,7 +154,7 @@ pub struct App {
     tr: RefCell<Option<flume::Receiver<Message>>>,
     control_pressed: Arc<AtomicBool>,
     #[allow(clippy::type_complexity)]
-    thread: RefCell<Option<JoinHandle<(Vec<Analysis>, Analysis)>>>,
+    thread: RefCell<Option<JoinHandle<(Vec<Analysis>, Option<Analysis>)>>>,
 
     args: RefCell<Args>,
     pwd: RefCell<PathBuf>,
@@ -280,38 +280,40 @@ impl App {
             ));
             buffer.push('\n');
         }
-        let mut analysis = total;
-        analysis.word_freq_map.iter().for_each(|item| {
-            let (word, count) = (item.key(), item.value());
-            analysis.word_freq.push((*count, *word))
-        });
-        analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
 
-        if analyses_count > 1 {
-            buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
+        if let Some(mut analysis) = total {
+            analysis.word_freq_map.iter().for_each(|item| {
+                let (word, count) = (item.key(), item.value());
+                analysis.word_freq.push((*count, *word))
+            });
+            analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
+
+            if analyses_count > 1 {
+                buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
+                buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+                buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+                buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+                buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
+                buffer.push_str("📈 Top words:\n");
+                buffer.push_str(&analysis_to_string(
+                    &analysis,
+                    args.top_words,
+                    args.bottom_words,
+                ));
+            }
+
+            buffer.push('\n');
+            buffer.push_str(&format!(
+                "📢 Summary of {} files (all words)\n",
+                analyses_count
+            ));
             buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
             buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
             buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
             buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
             buffer.push_str("📈 Top words:\n");
-            buffer.push_str(&analysis_to_string(
-                &analysis,
-                args.top_words,
-                args.bottom_words,
-            ));
+            buffer.push_str(&analysis_to_string(&analysis, 0, 0));
         }
-
-        buffer.push('\n');
-        buffer.push_str(&format!(
-            "📢 Summary of {} files (all words)\n",
-            analyses_count
-        ));
-        buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
-        buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
-        buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
-        buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
-        buffer.push_str("📈 Top words:\n");
-        buffer.push_str(&analysis_to_string(&analysis, 0, 0));
 
         self.text.set_text(&buffer);
         self.progress.set_state(nwg::ProgressBarState::Paused);
@@ -332,7 +334,6 @@ impl App {
         let args = self.args.borrow().clone();
         let pwd = self.pwd.borrow().clone();
         *thread = Some(std::thread::spawn(move || {
-            println!("kek");
             let result = analyze(
                 &sources,
                 &args,
@@ -348,7 +349,6 @@ impl App {
                 },
                 |_| (),
             );
-            println!("foo");
             let _ = tx.send(Message::End);
             result
         }));
