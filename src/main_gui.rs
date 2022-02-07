@@ -4,6 +4,7 @@
 #![feature(slice_take)]
 #![feature(const_mut_refs)]
 #![feature(thread_is_running)]
+#![feature(try_blocks)]
 
 use native_windows_derive as nwd;
 use native_windows_gui as nwg;
@@ -12,25 +13,33 @@ mod shared;
 mod uhash;
 mod ustring;
 
-use std::fs::canonicalize;
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::{
+    cell::RefCell,
+    fs::canonicalize,
+    io::Write,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::JoinHandle,
+    time::Duration,
+};
 
 use nwd::NwgUi;
 use nwg::stretch::{
     geometry::{Rect, Size},
     style::{AlignItems, AlignSelf, Dimension as D, FlexDirection, JustifyContent},
 };
-use nwg::EventData::OnKey;
 use nwg::NativeUi;
-use nwg::{Font, Icon};
+
 use pathdiff::diff_paths;
+use winapi::{
+    shared::windef::HWND,
+    um::wincon::{AttachConsole, FreeConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS},
+};
 
-use shared::{analyze, AnalyzeSource, Args};
-
-use self::shared::Analysis;
+use crate::shared::{analyze, Analysis, AnalyzeSource, Args};
 
 static ICON: &[u8] = include_bytes!("../resources/book.ico");
 
@@ -56,7 +65,10 @@ const RECT_102: Rect<D> = Rect {
     bottom: PT_20,
 };
 
-// use crate::shared::{analyze, Analysis, Args};
+enum Message {
+    Text(String),
+    End,
+}
 
 #[derive(Default, NwgUi)]
 pub struct App {
@@ -67,6 +79,7 @@ pub struct App {
         size: (820, 620)
     )]
     #[nwg_events(
+        OnInit: [App::setup],
         OnWindowClose: [nwg::stop_thread_dispatch()],
         OnFileDrop: [App::drop(SELF, EVT_DATA)],
         OnMinMaxInfo: [App::resize(SELF, EVT_DATA)],
@@ -88,7 +101,7 @@ pub struct App {
     #[nwg_control(
         flags: "VISIBLE|MARQUEE",
         marquee: true,
-        marquee_update: 20,
+        marquee_update: 1,
     )]
     #[nwg_layout_item(
         layout: layout,
@@ -127,103 +140,119 @@ pub struct App {
     )]
     status: nwg::StatusBar,
 
+    #[nwg_control(
+        parent: window,
+        interval: Duration::from_millis(10),
+        active: true,
+    )]
+    #[nwg_events(
+        OnTimerTick: [App::timertick(SELF)],
+    )]
+    timer: nwg::AnimationTimer,
+
+    tx: RefCell<Option<flume::Sender<Message>>>,
+    tr: RefCell<Option<flume::Receiver<Message>>>,
     control_pressed: Arc<AtomicBool>,
+    #[allow(clippy::type_complexity)]
+    thread: RefCell<Option<JoinHandle<(Vec<Analysis>, Analysis)>>>,
+
+    args: RefCell<Args>,
+    pwd: RefCell<PathBuf>,
 }
 
 impl App {
+    fn setup(&self) {
+        let mut icon = nwg::Icon::default();
+        let _ = nwg::Icon::builder().source_bin(Some(ICON)).build(&mut icon);
+        self.window.set_icon(Some(&icon));
+
+        let mut font = nwg::Font::default();
+        let _ = nwg::Font::builder()
+            .size(28)
+            .family("Segoe UI Emoji")
+            .build(&mut font);
+        self.text.set_font(Some(&font));
+
+        self.progress.set_state(nwg::ProgressBarState::Paused);
+
+        let args = std::env::args();
+        if args.len() > 1 {
+            self.start_analyze(
+                args.collect::<Vec<String>>()[1..]
+                    .iter()
+                    .map(|path| AnalyzeSource::Path(path.into()))
+                    .collect(),
+            );
+        }
+    }
+
     fn resize(&self, data: &nwg::EventData) {
         let data = data.on_min_max();
         data.set_min_size(820, 620);
     }
 
-    pub fn keypress(&self, data: &nwg::EventData) {
-        if let OnKey(key) = data {
+    fn keypress(&self, data: &nwg::EventData) {
+        if let nwg::EventData::OnKey(key) = data {
             if *key == nwg::keys::CONTROL {
                 self.control_pressed.store(true, Ordering::Relaxed);
             }
             if *key == nwg::keys::_V && self.control_pressed.load(Ordering::Relaxed) {
                 if let Some(text) = nwg::Clipboard::data_text(&self.window) {
-                    self.analyze(Vec::from([AnalyzeSource::Content(text)]));
+                    self.start_analyze(Vec::from([AnalyzeSource::Content(text)]));
                 }
             }
         }
     }
-    pub fn keyrelease(&self, data: &nwg::EventData) {
-        if let OnKey(key) = data {
+    fn keyrelease(&self, data: &nwg::EventData) {
+        if let nwg::EventData::OnKey(key) = data {
             if *key == nwg::keys::CONTROL {
                 self.control_pressed.store(false, Ordering::Relaxed);
             }
         }
     }
 
-    pub fn drop(&self, data: &nwg::EventData) {
+    fn drop(&self, data: &nwg::EventData) {
         let drop = data.on_file_drop();
-        self.analyze(
+        self.start_analyze(
             drop.files()
                 .iter()
-                .map(|path| AnalyzeSource::Path(path.into()))
+                .filter_map(|path| canonicalize(path).ok())
+                .map(AnalyzeSource::Path)
                 .collect(),
         );
     }
 
-    pub fn analyze(&self, sources: Vec<AnalyzeSource>) {
-        self.progress.set_state(nwg::ProgressBarState::Normal);
-        self.window.invalidate();
-
-        enum Message {
-            Text(String),
-            End,
-        }
-
-        let args = Args {
-            lowercase: false,
-            top_words: 10,
-            bottom_words: 3,
-            recursive: true,
-            follow_symlinks: false,
-            outfile: None,
-        };
-
-        let pwd = canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))
-            .unwrap_or_else(|_| PathBuf::new());
-        let (tx, tr) = flume::unbounded();
-        let _args = args.clone();
-        let _pwd = pwd.clone();
-        let thread = std::thread::spawn(move || {
-            let result = analyze(
-                &sources,
-                &_args,
-                &_pwd,
-                |error| {
-                    let _ = tx.send(Message::Text(error));
-                },
-                |message| {
-                    let _ = tx.send(Message::Text(message));
-                },
-                |message| {
-                    let _ = tx.send(Message::Text(message));
-                },
-                |_| (),
-            );
-            let _ = tx.send(Message::End);
-            result
-        });
-
-        loop {
-            if !thread.is_running() {
-                break;
+    fn timertick(&self) {
+        if let Ok(thread) = self.thread.try_borrow() {
+            if thread.is_none() {
+                self.progress.set_state(nwg::ProgressBarState::Paused);
             }
-            if let Ok(message) = tr.try_recv() {
-                match message {
-                    Message::Text(message) => self.status.set_text(0, &message),
-                    Message::End => break,
-                };
-            }
-            self.window.invalidate();
         }
+        let tr = self.tr.borrow().clone().unwrap();
+        while let Ok(message) = tr.try_recv() {
+            match message {
+                Message::Text(message) => self.status.set_text(0, &message),
+                Message::End => self.complete_analyze(),
+            };
+        }
+    }
+
+    pub fn complete_analyze(&self) {
+        let thread = self.thread.try_borrow_mut();
+        if thread.is_err() {
+            return;
+        }
+        let mut thread = thread.unwrap();
+        if thread.is_none() {
+            return;
+        }
+        let thread = thread.take().unwrap();
 
         let (analyses, total) = thread.join().unwrap();
         let analyses_count = analyses.len();
+
+        let args = self.args.borrow().clone();
+        let pwd = self.pwd.borrow().clone();
 
         let mut buffer = String::new();
 
@@ -287,6 +316,41 @@ impl App {
         self.text.set_text(&buffer);
         self.progress.set_state(nwg::ProgressBarState::Paused);
     }
+
+    pub fn start_analyze(&self, sources: Vec<AnalyzeSource>) {
+        let thread = self.thread.try_borrow_mut();
+        if thread.is_err() {
+            return;
+        }
+        let mut thread = thread.unwrap();
+
+        self.progress.set_state(nwg::ProgressBarState::Normal);
+        self.text.clear();
+        self.window.invalidate();
+
+        let tx = self.tx.borrow().clone().unwrap();
+        let args = self.args.borrow().clone();
+        let pwd = self.pwd.borrow().clone();
+        *thread = Some(std::thread::spawn(move || {
+            let result = analyze(
+                &sources,
+                &args,
+                &pwd,
+                |error| {
+                    let _ = tx.send(Message::Text(error));
+                },
+                |message| {
+                    let _ = tx.send(Message::Text(message));
+                },
+                |message| {
+                    let _ = tx.send(Message::Text(message));
+                },
+                |_| (),
+            );
+            let _ = tx.send(Message::End);
+            result
+        }));
+    }
 }
 
 fn analysis_to_string(analysis: &Analysis, top_words: usize, bottom_words: usize) -> String {
@@ -320,30 +384,38 @@ fn analysis_to_string(analysis: &Analysis, top_words: usize, bottom_words: usize
 }
 
 fn main() {
-    nwg::init().expect("Failed to init Native Windows GUI");
-    let _ = nwg::Font::set_global_family("Segoe UI");
-    let app = App::build_ui(Default::default()).expect("Failed to build UI");
-    let mut icon = Icon::default();
-    let _ = Icon::builder().source_bin(Some(ICON)).build(&mut icon);
-    app.window.set_icon(Some(&icon));
-    let mut font = Font::default();
-    let _ = Font::builder()
-        .size(28)
-        .family("Segoe UI Emoji")
-        .build(&mut font);
-    app.text.set_font(Some(&font));
-
-    app.progress.set_state(nwg::ProgressBarState::Paused);
-
-    let args = std::env::args();
-    if args.len() > 1 {
-        app.analyze(
-            args.collect::<Vec<String>>()[1..]
-                .iter()
-                .map(|path| AnalyzeSource::Path(path.into()))
-                .collect(),
-        );
+    let mut console = std::ptr::null::<HWND>() as HWND;
+    unsafe {
+        if AttachConsole(ATTACH_PARENT_PROCESS) != 0 {
+            console = GetConsoleWindow();
+        }
     }
 
+    nwg::init().expect("Failed to init Native Windows GUI");
+    let _ = nwg::Font::set_global_family("Segoe UI");
+
+    let app = App::build_ui(Default::default()).expect("Failed to build UI");
+    let (tx, tr) = flume::unbounded();
+    (*app.tx.borrow_mut()) = Some(tx);
+    (*app.tr.borrow_mut()) = Some(tr);
+    (*app.args.borrow_mut()) = Args {
+        lowercase: false,
+        top_words: 10,
+        bottom_words: 3,
+        recursive: true,
+        follow_symlinks: false,
+        outfile: None,
+    };
+    (*app.pwd.borrow_mut()) =
+        canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))
+            .unwrap_or_else(|_| PathBuf::new());
+
     nwg::dispatch_thread_events();
+
+    unsafe {
+        if !console.is_null() {
+            let _ = std::io::stdout().flush();
+        }
+        FreeConsole();
+    }
 }

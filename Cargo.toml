@@ -41,7 +41,16 @@ rayon = {version = "1"}
 unicode-segmentation = {version = "1"}
 walkdir = {version = "2"}
 
-clap = {version = "3", features = ["std", "color", "suggestions", "derive", "env", "regex", "unicode", "wrap_help"], optional = true}
+clap = {version = "3", features = [
+  "std",
+  "color",
+  "suggestions",
+  "derive",
+  "env",
+  "regex",
+  "unicode",
+  "wrap_help",
+], optional = true}
 console = {version = "0.15", optional = true}
 indicatif = {version = "0.17.0-rc.2", optional = true}
 wild = {version = "2.1.0-alpha.2", optional = true}
@@ -49,12 +58,16 @@ wild = {version = "2.1.0-alpha.2", optional = true}
 flume = {version = "0.10", optional = true}
 native-windows-derive = {version = "1", optional = true}
 native-windows-gui = {version = "1", default-features = false, features = ["all"], optional = true}
+winapi = {version = "0.3", default-features = false, features = [
+  "wincon",
+  "wincontypes",
+], optional = true}
 
 [features]
 default = ["cli"]
 
 cli = ["wild", "clap", "indicatif", "console"]
-gui = ["native-windows-gui", "native-windows-derive", "flume"]
+gui = ["native-windows-gui", "native-windows-derive", "flume", "winapi"]
 
 [build-dependencies]
 winres = {version = "0.1"}
