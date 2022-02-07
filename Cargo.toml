@@ -11,6 +11,7 @@ version = "0.1.0"
 [[bin]]
 name = "wordstat"
 path = "src/main_cli.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "wordstat-gui"
@@ -31,25 +32,29 @@ strip = "symbols"
 
 bumpalo = {version = "3"}
 byteorder = {version = "1"}
-clap = {version = "3", features = ["std", "color", "suggestions", "derive", "env", "regex", "unicode", "wrap_help"]}
-console = {version = "0.15"}
 entangled = {version = "1"}
-flume = {version = "0.10"}
 futures = {version = "0.3"}
-indicatif = {version = "0.17.0-rc.2"}
 num_cpus = {version = "1"}
 parking_lot = {version = "0.12"}
 pathdiff = {version = "0.2"}
 rayon = {version = "1"}
 unicode-segmentation = {version = "1"}
 walkdir = {version = "2"}
-wild = {version = "2.1.0-alpha.2"}
 
+clap = {version = "3", features = ["std", "color", "suggestions", "derive", "env", "regex", "unicode", "wrap_help"], optional = true}
+console = {version = "0.15", optional = true}
+indicatif = {version = "0.17.0-rc.2", optional = true}
+wild = {version = "2.1.0-alpha.2", optional = true}
+
+flume = {version = "0.10", optional = true}
 native-windows-derive = {version = "1", optional = true}
-native-windows-gui = {version = "1", optional = true, default-features = false, features = ["all"]}
+native-windows-gui = {version = "1", default-features = false, features = ["all"], optional = true}
 
 [features]
-gui = ["native-windows-gui", "native-windows-derive"]
+default = ["cli"]
+
+cli = ["wild", "clap", "indicatif", "console"]
+gui = ["native-windows-gui", "native-windows-derive", "flume"]
 
 [build-dependencies]
 winres = {version = "0.1"}

@@ -55,7 +55,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --target x86_64-pc-windows-msvc --bin wordstat-gui --features gui
+          args: --release --target x86_64-pc-windows-msvc --bin wordstat-gui --no-default-features --features gui
 
       - name: Collect executables
         run: |
