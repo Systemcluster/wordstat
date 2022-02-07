@@ -55,18 +55,23 @@ const RECT_0: Rect<D> = Rect {
     bottom: PT_0,
 };
 const PT_10: D = D::Points(10.0);
-const PT_20: D = D::Points(20.0);
 const RECT_100: Rect<D> = Rect {
-    start: PT_10,
-    end: PT_10,
+    start: PT_0,
+    end: PT_0,
     top: PT_10,
     bottom: PT_0,
 };
-const RECT_102: Rect<D> = Rect {
+const RECT_101: Rect<D> = Rect {
     start: PT_10,
     end: PT_10,
     top: PT_10,
-    bottom: PT_20,
+    bottom: PT_10,
+};
+const RECT_102: Rect<D> = Rect {
+    start: PT_0,
+    end: PT_0,
+    top: PT_10,
+    bottom: PT_10,
 };
 
 enum Message {
@@ -79,6 +84,7 @@ pub struct App {
     #[nwg_control(
         title: "WordStat",
         accept_files: true,
+        flags: "MAIN_WINDOW|VISIBLE|RESIZABLE",
         center: true,
         size: (820, 620)
     )]
@@ -95,7 +101,7 @@ pub struct App {
     #[nwg_layout(
         parent: window,
         flex_direction: FlexDirection::Column,
-        padding: RECT_0,
+        padding: RECT_101,
         min_size: Size { width: D::Points(420.0), height: D::Points(520.0) },
         align_items: AlignItems::Stretch,
         justify_content: JustifyContent::Center,
@@ -110,11 +116,28 @@ pub struct App {
     #[nwg_layout_item(
         layout: layout,
         align_self: AlignSelf::Stretch,
-        margin: RECT_100,
+        margin: RECT_0,
         flex_grow: 0.0,
         min_size: Size { width: D::Auto, height: D::Points(15.0) },
     )]
     progress: nwg::ProgressBar,
+
+    #[nwg_control(
+        flags: "VISIBLE",
+        placeholder_text: Some("Search..."),
+    )]
+    #[nwg_layout_item(
+        layout: layout,
+        align_self: AlignSelf::Stretch,
+        margin: RECT_100,
+        flex_grow: 0.1,
+        size: Size { width: D::Auto, height: D::Points(20.0) },
+    )]
+    #[nwg_events(
+        OnKeyPress: [App::keypress(SELF, EVT_DATA)],
+        OnTextInput: [App::search(SELF)],
+    )]
+    search: nwg::TextInput,
 
     #[nwg_control(
         readonly: true,
@@ -170,6 +193,7 @@ pub struct App {
     control_pressed: Arc<AtomicBool>,
     #[allow(clippy::type_complexity)]
     thread: RefCell<Option<JoinHandle<(Vec<Analysis>, Option<Analysis>)>>>,
+    analyses: RefCell<(Vec<Analysis>, Option<Analysis>)>,
 
     args: RefCell<Args>,
     pwd: RefCell<PathBuf>,
@@ -193,16 +217,8 @@ impl App {
             .build(&mut font);
         self.text.set_font(Some(&font));
         self.status.set_font(Some(&font));
-
-        let args = std::env::args();
-        if args.len() > 1 {
-            self.start_analyze(
-                args.collect::<Vec<String>>()[1..]
-                    .iter()
-                    .map(|path| AnalyzeSource::Path(path.into()))
-                    .collect(),
-            );
-        }
+        self.search.set_font(Some(&font));
+        let _ = self.layout.fit();
 
         self.matchdpi();
     }
@@ -218,10 +234,17 @@ impl App {
             if *key == nwg::keys::CONTROL {
                 self.control_pressed.store(true, Ordering::Relaxed);
             }
+            if *key == nwg::keys::ESCAPE {
+                self.window.set_focus();
+                self.progress.set_focus();
+            }
             if *key == nwg::keys::_V && self.control_pressed.load(Ordering::Relaxed) {
                 if let Some(text) = nwg::Clipboard::data_text(&self.window) {
                     self.start_analyze(Vec::from([AnalyzeSource::Content(text)]));
                 }
+            }
+            if *key == nwg::keys::_F && self.control_pressed.load(Ordering::Relaxed) {
+                self.search.set_focus();
             }
         }
     }
@@ -231,6 +254,10 @@ impl App {
                 self.control_pressed.store(false, Ordering::Relaxed);
             }
         }
+    }
+
+    fn search(&self) {
+        self.update_text();
     }
 
     fn drop(&self, data: &nwg::EventData) {
@@ -277,28 +304,21 @@ impl App {
                     .family("Segoe UI Emoji")
                     .build(&mut font);
                 self.status.set_font(Some(&font));
+                self.search.set_font(Some(&font));
+                let _ = self.layout.fit();
+                self.window.invalidate();
             }
         }
     }
 
-    pub fn complete_analyze(&self) {
-        let thread = self.thread.try_borrow_mut();
-        if thread.is_err() {
-            return;
-        }
-        let mut thread = thread.unwrap();
-        if thread.is_none() {
-            return;
-        }
-        let thread = thread.take().unwrap();
-
-        let (analyses, total) = thread.join().unwrap();
-        let analyses_count = analyses.len();
-
+    pub fn update_text(&self) {
+        let analyses = self.analyses.borrow();
+        let (analyses, total) = (&analyses.0, &analyses.1);
+        let mut buffer = String::new();
         let args = self.args.borrow().clone();
         let pwd = self.pwd.borrow().clone();
-
-        let mut buffer = String::new();
+        let analyses_count = analyses.len();
+        let search_text = self.search.text();
 
         for analysis in analyses {
             buffer.push_str(&format!(
@@ -317,21 +337,35 @@ impl App {
             buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
             buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
             buffer.push_str("📈 Top words:\n");
-            buffer.push_str(&analysis_to_string(
-                &analysis,
-                args.top_words,
-                args.bottom_words,
-            ));
+            if search_text.is_empty() {
+                let analysis_string =
+                    analysis_to_string(analysis, args.top_words, args.bottom_words);
+                buffer.push_str(&analysis_string);
+            } else {
+                let mut tmp_analysis = analysis.clone();
+                tmp_analysis.word_freq = tmp_analysis
+                    .word_freq
+                    .into_iter()
+                    .filter(|(_, string)| {
+                        string.to_lowercase().contains(&search_text.to_lowercase())
+                    })
+                    .collect();
+                let analysis_string =
+                    analysis_to_string(&tmp_analysis, args.top_words, args.bottom_words);
+                buffer.push_str(
+                    &analysis_string
+                        .lines()
+                        .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
+                        .map(String::from)
+                        .reduce(|a, b| format!("{}\n{}", a, b))
+                        .unwrap_or_default(),
+                );
+                buffer.push('\n');
+            }
             buffer.push('\n');
         }
 
-        if let Some(mut analysis) = total {
-            analysis.word_freq_map.iter().for_each(|item| {
-                let (word, count) = (item.key(), item.value());
-                analysis.word_freq.push((*count, *word))
-            });
-            analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
-
+        if let Some(ref analysis) = total {
             if analyses_count > 1 {
                 buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
                 buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
@@ -339,11 +373,33 @@ impl App {
                 buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
                 buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
                 buffer.push_str("📈 Top words:\n");
-                buffer.push_str(&analysis_to_string(
-                    &analysis,
-                    args.top_words,
-                    args.bottom_words,
-                ));
+                if search_text.is_empty() {
+                    let analysis_string =
+                        analysis_to_string(analysis, args.top_words, args.bottom_words);
+                    buffer.push_str(&analysis_string);
+                } else {
+                    let mut tmp_analysis = analysis.clone();
+                    tmp_analysis.word_freq = tmp_analysis
+                        .word_freq
+                        .into_iter()
+                        .filter(|(_, string)| {
+                            string.to_lowercase().contains(&search_text.to_lowercase())
+                        })
+                        .collect();
+                    let analysis_string =
+                        analysis_to_string(&tmp_analysis, args.top_words, args.bottom_words);
+                    buffer.push_str(
+                        &analysis_string
+                            .lines()
+                            .filter(|line| {
+                                line.to_lowercase().contains(&search_text.to_lowercase())
+                            })
+                            .map(String::from)
+                            .reduce(|a, b| format!("{}\n{}", a, b))
+                            .unwrap_or_default(),
+                    );
+                }
+                buffer.push('\n');
             }
 
             buffer.push('\n');
@@ -356,11 +412,59 @@ impl App {
             buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
             buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
             buffer.push_str("📈 Top words:\n");
-            buffer.push_str(&analysis_to_string(&analysis, 0, 0));
+            if search_text.is_empty() {
+                let analysis_string = analysis_to_string(analysis, 0, 0);
+                buffer.push_str(&analysis_string);
+            } else {
+                let mut tmp_analysis = analysis.clone();
+                tmp_analysis.word_freq = tmp_analysis
+                    .word_freq
+                    .into_iter()
+                    .filter(|(_, string)| {
+                        string.to_lowercase().contains(&search_text.to_lowercase())
+                    })
+                    .collect();
+                let analysis_string = analysis_to_string(&tmp_analysis, 0, 0);
+                buffer.push_str(
+                    &analysis_string
+                        .lines()
+                        .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
+                        .map(String::from)
+                        .reduce(|a, b| format!("{}\n{}", a, b))
+                        .unwrap_or_default(),
+                );
+            }
         }
 
         self.text.set_text(&buffer);
+    }
+
+    pub fn complete_analyze(&self) {
+        let thread = self.thread.try_borrow_mut();
+        if thread.is_err() {
+            return;
+        }
+        let mut thread = thread.unwrap();
+        if thread.is_none() {
+            return;
+        }
+        let thread = thread.take().unwrap();
+
+        let (analyses, mut total) = thread.join().unwrap();
+        if let Some(ref mut analysis) = total {
+            analysis.word_freq_map.iter().for_each(|item| {
+                let (word, count) = (item.key(), item.value());
+                analysis.word_freq.push((*count, *word))
+            });
+            analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
+        }
+        (*self.analyses.borrow_mut()) = (analyses, total);
+
+        self.update_text();
+
         self.progress.set_state(nwg::ProgressBarState::Paused);
+        self.search.set_enabled(true);
+        self.window.invalidate();
     }
 
     pub fn start_analyze(&self, sources: Vec<AnalyzeSource>) {
@@ -371,6 +475,7 @@ impl App {
         let mut thread = thread.unwrap();
 
         self.progress.set_state(nwg::ProgressBarState::Normal);
+        self.search.set_enabled(false);
         self.text.clear();
         self.window.invalidate();
 
@@ -461,6 +566,16 @@ fn main() {
     (*app.pwd.borrow_mut()) =
         canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))
             .unwrap_or_else(|_| PathBuf::new());
+
+    let args = std::env::args();
+    if args.len() > 1 {
+        app.start_analyze(
+            args.collect::<Vec<String>>()[1..]
+                .iter()
+                .map(|path| AnalyzeSource::Path(path.into()))
+                .collect(),
+        );
+    }
 
     nwg::dispatch_thread_events();
 
