@@ -398,8 +398,6 @@ impl App {
         let _ = nwg::Icon::builder().source_bin(Some(ICON)).build(&mut icon);
         self.window.set_icon(Some(&icon));
 
-        self.progress.set_state(nwg::ProgressBarState::Paused);
-
         self.dpi.store(96, Ordering::Relaxed);
         let mut font = nwg::Font::default();
         let _ = nwg::Font::builder()
@@ -662,6 +660,8 @@ fn main() {
                 .map(|path| AnalyzeSource::Path(path.into()))
                 .collect(),
         );
+    } else {
+        app.progress.set_state(nwg::ProgressBarState::Paused);
     }
 
     nwg::dispatch_thread_events();
