@@ -398,7 +398,7 @@ fn get_result_text(
         })
     }
 
-    buffer
+    buffer.replace("\r\n", "\n").replace('\n', "\r\n")
 }
 
 impl App {
