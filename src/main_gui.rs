@@ -232,9 +232,13 @@ pub struct App {
     dpi: Arc<AtomicU32>,
 }
 
-fn analysis_words_to_string(analysis: &Analysis, top_words: usize, bottom_words: usize) -> String {
+fn analysis_words_to_string(
+    analysis: &Analysis,
+    top_words: usize,
+    bottom_words: usize,
+) -> (String, String) {
     if analysis.word_freq.is_empty() {
-        return "".to_owned();
+        return ("".to_owned(), "".to_owned());
     }
     let pad = format!("{}", analysis.word_freq[0].0).len();
     let mut buffer = String::new();
@@ -247,23 +251,33 @@ fn analysis_words_to_string(analysis: &Analysis, top_words: usize, bottom_words:
         buffer.push_str(string);
         buffer.push('\n');
     }
+    let mut buffer_bottom = String::new();
     if bottom_words > 0
         && top_words != 0
         && top_words < analysis.word_count
         && top_words < analysis.word_freq.len()
     {
-        buffer.push_str("  ...\n");
+        let pad = format!(
+            "{}",
+            analysis
+                .word_freq
+                .iter()
+                .nth_back(0)
+                .map(|n| n.0)
+                .unwrap_or(0)
+        )
+        .len();
         for (i, (freq, string)) in analysis.word_freq.iter().rev().enumerate() {
             if bottom_words > 0 && i >= bottom_words {
                 break;
             };
-            buffer.push_str(&format!("  {:width$}", freq, width = pad));
-            buffer.push_str(": ");
-            buffer.push_str(string);
-            buffer.push('\n');
+            buffer_bottom.push_str(&format!("  {:width$}", freq, width = pad));
+            buffer_bottom.push_str(": ");
+            buffer_bottom.push_str(string);
+            buffer_bottom.push('\n');
         }
     }
-    buffer
+    (buffer, buffer_bottom)
 }
 
 fn analysis_to_string(
@@ -274,7 +288,7 @@ fn analysis_to_string(
     search_text: &str,
 ) -> String {
     let mut buffer = String::new();
-    let analysis_string = if search_text.is_empty() {
+    let (analysis_string, analysis_string_bottom) = if search_text.is_empty() {
         analysis_words_to_string(analysis, top_words, bottom_words)
     } else {
         let mut tmp_analysis = analysis.clone();
@@ -322,6 +336,14 @@ fn analysis_to_string(
         }
         buffer.push_str(":\n");
         buffer.push_str(&analysis_string);
+        if !analysis_string_bottom.is_empty() {
+            buffer.push_str("📉 Bottom words");
+            if !search_text.is_empty() {
+                buffer.push_str(" (filtered)")
+            }
+            buffer.push_str(":\n");
+            buffer.push_str(&analysis_string_bottom);
+        }
     };
     buffer
 }

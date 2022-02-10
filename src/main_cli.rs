@@ -51,7 +51,6 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
         eprintln!("{}{}", Emoji("⚠️ ", ""), style("No words in file").red());
         return;
     }
-    let pad = format!("{}", analysis.word_freq[0].0).len();
     println!(
         "{}Word count: {}",
         Emoji("🔢 ", ""),
@@ -98,6 +97,7 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
         style(&format!("{:.1}", analysis.word_dist_mode)).blue()
     );
     println!("{}Top words:", Emoji("📈 ", ""));
+    let pad = format!("{}", analysis.word_freq[0].0).len();
     for (i, (freq, string)) in analysis.word_freq.iter().enumerate() {
         if top_words > 0 && i >= top_words {
             break;
@@ -111,7 +111,17 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
         );
     }
     if bottom_words > 0 && top_words != 0 && top_words < analysis.word_count {
-        println!("  ...");
+        let pad = format!(
+            "{}",
+            analysis
+                .word_freq
+                .iter()
+                .nth_back(0)
+                .map(|n| n.0)
+                .unwrap_or(0)
+        )
+        .len();
+        println!("{}Bottom words:", Emoji("📉 ", ""));
         for (i, (freq, string)) in analysis.word_freq.iter().rev().enumerate() {
             if bottom_words > 0 && i >= bottom_words {
                 break;
