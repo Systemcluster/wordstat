@@ -46,6 +46,9 @@ pub struct Args {
 }
 
 fn update_dists(analysis: &mut Analysis) {
+    if analysis.word_freq.is_empty() {
+        return;
+    }
     analysis.word_dist_mean = analysis
         .word_freq
         .iter()
