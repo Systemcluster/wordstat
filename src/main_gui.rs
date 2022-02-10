@@ -298,6 +298,15 @@ fn analysis_to_string(
     buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
     buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
     buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
+    buffer.push_str(&format!("🔢 Unique words: {}\n", analysis.word_uniqs));
+    buffer.push_str(&format!(
+        "🔢 Word frequency mean: {:.2}\n",
+        analysis.word_dist_mean
+    ));
+    buffer.push_str(&format!(
+        "🔢 Word frequency standard deviation: {:.2}\n",
+        analysis.word_dist_stddev
+    ));
     buffer.push_str("📈 Top words:\n");
     buffer.push_str(if analysis_string.is_empty() {
         if search_text.is_empty() {
@@ -558,14 +567,7 @@ impl App {
         }
         let thread = thread.take().unwrap();
 
-        let (analyses, mut total) = thread.join().unwrap();
-        if let Some(ref mut analysis) = total {
-            analysis.word_freq_map.iter().for_each(|item| {
-                let (word, count) = (item.key(), item.value());
-                analysis.word_freq.push((*count, *word))
-            });
-            analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
-        }
+        let (analyses, total) = thread.join().unwrap();
         (*self.analyses.borrow_mut()) = (analyses, total);
 
         self.text.set_text(&get_result_text(

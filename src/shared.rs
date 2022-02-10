@@ -24,8 +24,11 @@ pub struct Analysis {
     pub char_count: usize,
     pub sent_count: usize,
     pub para_count: usize,
+    pub word_uniqs: usize,
     pub word_freq: Vec<(usize, UniqueString)>,
     pub word_freq_map: DashMap<UniqueString, usize, BuildHasherDefault<IdentityHasher>>,
+    pub word_dist_mean: f64,
+    pub word_dist_stddev: f64,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -80,10 +83,26 @@ async fn process(
         .sum();
     map.iter().for_each(|item| {
         let (word, count) = (item.key(), item.value());
-        analysis.word_freq.push((*count, *word))
+        analysis.word_freq.push((*count, *word));
     });
     analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
     analysis.word_freq_map = map;
+    analysis.word_uniqs = analysis.word_freq.len();
+    analysis.word_dist_mean = analysis
+        .word_freq
+        .iter()
+        .map(|a| a.0)
+        .reduce(|a, b| a + b)
+        .unwrap_or_default() as f64
+        / analysis.word_uniqs as f64;
+    analysis.word_dist_stddev = (analysis
+        .word_freq
+        .iter()
+        .map(|a| (a.0 as f64 - analysis.word_dist_mean).powi(2))
+        .reduce(|a, b| a + b)
+        .unwrap_or_default()
+        / analysis.word_uniqs as f64)
+        .sqrt();
 
     Ok(analysis)
 }
@@ -205,6 +224,28 @@ pub fn analyze<
         .into_iter()
         .filter_map(|analysis| analysis.ok())
         .collect();
+    if let Some(analysis) = &mut total {
+        analysis.word_freq_map.iter().for_each(|item| {
+            let (word, count) = (item.key(), item.value());
+            analysis.word_freq.push((*count, *word))
+        });
+        analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
+        analysis.word_dist_mean = analysis
+            .word_freq
+            .iter()
+            .map(|a| a.0)
+            .reduce(|a, b| a + b)
+            .unwrap_or_default() as f64
+            / analysis.word_uniqs as f64;
+        analysis.word_dist_stddev = (analysis
+            .word_freq
+            .iter()
+            .map(|a| (a.0 as f64 - analysis.word_dist_mean).powi(2))
+            .reduce(|a, b| a + b)
+            .unwrap_or_default()
+            / analysis.word_uniqs as f64)
+            .sqrt();
+    }
 
     (analyses, total)
 }

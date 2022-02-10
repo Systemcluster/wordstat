@@ -72,6 +72,21 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
         Emoji("🔢 ", ""),
         style(&format!("{}", analysis.para_count)).blue()
     );
+    println!(
+        "{}Unique words: {}",
+        Emoji("🔢 ", ""),
+        style(&format!("{}", analysis.word_uniqs)).blue()
+    );
+    println!(
+        "{}Word frequency mean: {}",
+        Emoji("🔢 ", ""),
+        style(&format!("{:.2}", analysis.word_dist_mean)).blue()
+    );
+    println!(
+        "{}Word frequency standard deviation: {}",
+        Emoji("🔢 ", ""),
+        style(&format!("{:.2}", analysis.word_dist_stddev)).blue()
+    );
     println!("{}Top words:", Emoji("📈 ", ""));
     for (i, (freq, string)) in analysis.word_freq.iter().enumerate() {
         if top_words > 0 && i >= top_words {
@@ -222,14 +237,8 @@ fn main() {
         print_analysis(analysis, args.top_words, args.bottom_words);
     }
 
-    if let Some(mut analysis) = total {
+    if let Some(analysis) = total {
         if analyses_count > 1 {
-            analysis.word_freq_map.iter().for_each(|item| {
-                let (word, count) = (item.key(), item.value());
-                analysis.word_freq.push((*count, *word));
-            });
-            analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
-
             println!();
             println!(
                 "{}{} {} {}",
