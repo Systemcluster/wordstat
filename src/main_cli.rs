@@ -79,13 +79,23 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
     );
     println!(
         "{}Word frequency mean: {}",
-        Emoji("🔢 ", ""),
+        Emoji("📊 ", ""),
         style(&format!("{:.2}", analysis.word_dist_mean)).blue()
     );
     println!(
         "{}Word frequency standard deviation: {}",
-        Emoji("🔢 ", ""),
+        Emoji("📊 ", ""),
         style(&format!("{:.2}", analysis.word_dist_stddev)).blue()
+    );
+    println!(
+        "{}Word frequency median: {}",
+        Emoji("📊 ", ""),
+        style(&format!("{:.1}", analysis.word_dist_median)).blue()
+    );
+    println!(
+        "{}Word frequency mode: {}",
+        Emoji("📊 ", ""),
+        style(&format!("{:.1}", analysis.word_dist_mode)).blue()
     );
     println!("{}Top words:", Emoji("📈 ", ""));
     for (i, (freq, string)) in analysis.word_freq.iter().enumerate() {

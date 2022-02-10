@@ -294,12 +294,20 @@ fn analysis_to_string(
     buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
     buffer.push_str(&format!("🔢 Unique words: {}\n", analysis.word_uniqs));
     buffer.push_str(&format!(
-        "🔢 Word frequency mean: {:.2}\n",
+        "📊 Word frequency mean: {:.2}\n",
         analysis.word_dist_mean
     ));
     buffer.push_str(&format!(
-        "🔢 Word frequency standard deviation: {:.2}\n",
+        "📊 Word frequency standard deviation: {:.2}\n",
         analysis.word_dist_stddev
+    ));
+    buffer.push_str(&format!(
+        "📊 Word frequency median: {:.1}\n",
+        analysis.word_dist_median
+    ));
+    buffer.push_str(&format!(
+        "📊 Word frequency mode: {:.1}\n",
+        analysis.word_dist_mode
     ));
     if analysis_string.is_empty() {
         buffer.push_str(if search_text.is_empty() {

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     hash::BuildHasherDefault,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -29,6 +30,8 @@ pub struct Analysis {
     pub word_freq_map: DashMap<UniqueString, usize, BuildHasherDefault<IdentityHasher>>,
     pub word_dist_mean: f64,
     pub word_dist_stddev: f64,
+    pub word_dist_median: f64,
+    pub word_dist_mode: f64,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -40,6 +43,55 @@ pub struct Args {
     pub follow_symlinks: bool,
     pub outfile: Option<String>,
     pub hide_empty: bool,
+}
+
+fn update_dists(analysis: &mut Analysis) {
+    analysis.word_dist_mean = analysis
+        .word_freq
+        .iter()
+        .map(|a| a.0)
+        .reduce(|a, b| a + b)
+        .unwrap_or_default() as f64
+        / analysis.word_uniqs as f64;
+    analysis.word_dist_stddev = (analysis
+        .word_freq
+        .iter()
+        .map(|a| (a.0 as f64 - analysis.word_dist_mean).powi(2))
+        .reduce(|a, b| a + b)
+        .unwrap_or_default()
+        / analysis.word_uniqs as f64)
+        .sqrt();
+    analysis.word_dist_median = match analysis.word_freq.len() % 2 == 0 {
+        true => {
+            (analysis.word_freq[(analysis.word_freq.len()) / 2 - 1].0
+                + analysis.word_freq[(analysis.word_freq.len()) / 2].0) as f64
+                / 2.0
+        }
+        false => analysis.word_freq[analysis.word_freq.len() / 2].0 as f64,
+    };
+
+    let mut mode_counts = HashMap::new();
+    analysis
+        .word_freq
+        .iter()
+        .for_each(|(freq, _)| *mode_counts.entry(*freq).or_insert(0) += 1);
+    let max_count = mode_counts
+        .iter()
+        .max_by_key(|(_, &v)| v)
+        .map(|(_, &v)| v)
+        .unwrap_or(0);
+    if max_count > 0 {
+        let mut counts = 0;
+        analysis.word_dist_mode =
+            mode_counts
+                .iter()
+                .filter(|(_, &v)| v == max_count)
+                .fold(0, |acc, (&k, _)| {
+                    counts += 1;
+                    acc + k
+                }) as f64
+                / counts as f64;
+    }
 }
 
 async fn process(
@@ -88,21 +140,7 @@ async fn process(
     analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
     analysis.word_freq_map = map;
     analysis.word_uniqs = analysis.word_freq.len();
-    analysis.word_dist_mean = analysis
-        .word_freq
-        .iter()
-        .map(|a| a.0)
-        .reduce(|a, b| a + b)
-        .unwrap_or_default() as f64
-        / analysis.word_uniqs as f64;
-    analysis.word_dist_stddev = (analysis
-        .word_freq
-        .iter()
-        .map(|a| (a.0 as f64 - analysis.word_dist_mean).powi(2))
-        .reduce(|a, b| a + b)
-        .unwrap_or_default()
-        / analysis.word_uniqs as f64)
-        .sqrt();
+    update_dists(&mut analysis);
 
     Ok(analysis)
 }
@@ -231,21 +269,7 @@ pub fn analyze<
             analysis.word_freq.push((*count, *word))
         });
         analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
-        analysis.word_dist_mean = analysis
-            .word_freq
-            .iter()
-            .map(|a| a.0)
-            .reduce(|a, b| a + b)
-            .unwrap_or_default() as f64
-            / analysis.word_uniqs as f64;
-        analysis.word_dist_stddev = (analysis
-            .word_freq
-            .iter()
-            .map(|a| (a.0 as f64 - analysis.word_dist_mean).powi(2))
-            .reduce(|a, b| a + b)
-            .unwrap_or_default()
-            / analysis.word_uniqs as f64)
-            .sqrt();
+        update_dists(analysis);
     }
 
     (analyses, total)
