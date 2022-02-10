@@ -182,6 +182,7 @@ fn main() {
         bottom_words: args.bottom_words,
         recursive: args.recursive,
         follow_symlinks: args.follow_symlinks,
+        hide_empty: false,
         outfile: args.outfile,
     };
 

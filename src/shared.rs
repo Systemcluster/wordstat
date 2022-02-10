@@ -36,6 +36,7 @@ pub struct Args {
     pub recursive: bool,
     pub follow_symlinks: bool,
     pub outfile: Option<String>,
+    pub hide_empty: bool,
 }
 
 async fn process(
@@ -88,6 +89,7 @@ async fn process(
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum AnalyzeSource {
     Content(String),
     Path(PathBuf),

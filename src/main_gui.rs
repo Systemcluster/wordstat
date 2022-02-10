@@ -99,6 +99,32 @@ pub struct App {
     )]
     window: nwg::Window,
 
+    #[nwg_control(
+        text: "&Settings"
+    )]
+    #[nwg_events(
+        OnMenuOpen: [App::menu_settings],
+    )]
+    menu_settings: nwg::Menu,
+    #[nwg_control(
+        text: "&Lowercase Words",
+        parent: menu_settings,
+        check: false
+    )]
+    #[nwg_events(
+        OnMenuItemSelected: [App::menu_settings_lowercase],
+    )]
+    menu_settings_lowercase: nwg::MenuItem,
+    #[nwg_control(
+        text: "&Hide Empty Sources",
+        parent: menu_settings,
+        check: false
+    )]
+    #[nwg_events(
+        OnMenuItemSelected: [App::menu_settings_hide_empty],
+    )]
+    menu_settings_hide_empty: nwg::MenuItem,
+
     #[nwg_layout(
         parent: window,
         flex_direction: FlexDirection::Column,
@@ -201,13 +227,14 @@ pub struct App {
 
     args: RefCell<Args>,
     pwd: RefCell<PathBuf>,
+    last_source: RefCell<Vec<AnalyzeSource>>,
 
     dpi: Arc<AtomicU32>,
 }
 
 fn analysis_words_to_string(analysis: &Analysis, top_words: usize, bottom_words: usize) -> String {
     if analysis.word_freq.is_empty() {
-        return "No words in file".to_owned();
+        return "".to_owned();
     }
     let pad = format!("{}", analysis.word_freq[0].0).len();
     let mut buffer = String::new();
@@ -243,17 +270,12 @@ fn analysis_to_string(
     analysis: &Analysis,
     top_words: usize,
     bottom_words: usize,
+    hide_empty: bool,
     search_text: &str,
 ) -> String {
     let mut buffer = String::new();
-    buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
-    buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
-    buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
-    buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
-    buffer.push_str("📈 Top words:\n");
-    if search_text.is_empty() {
-        let analysis_string = analysis_words_to_string(analysis, top_words, bottom_words);
-        buffer.push_str(&analysis_string);
+    let analysis_string = if search_text.is_empty() {
+        analysis_words_to_string(analysis, top_words, bottom_words)
     } else {
         let mut tmp_analysis = analysis.clone();
         tmp_analysis.word_freq = tmp_analysis
@@ -262,15 +284,30 @@ fn analysis_to_string(
             .filter(|(_, string)| string.to_lowercase().contains(&search_text.to_lowercase()))
             .collect();
         let analysis_string = analysis_words_to_string(&tmp_analysis, top_words, bottom_words);
-        buffer.push_str(
-            &analysis_string
-                .lines()
-                .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
-                .map(String::from)
-                .reduce(|a, b| format!("{}\n{}", a, b))
-                .unwrap_or_default(),
-        );
+        analysis_string
+            .lines()
+            .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
+            .map(String::from)
+            .reduce(|a, b| format!("{}\n{}", a, b))
+            .unwrap_or_default()
+    };
+    if analysis_string.is_empty() && hide_empty {
+        return buffer;
     }
+    buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+    buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+    buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+    buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
+    buffer.push_str("📈 Top words:\n");
+    buffer.push_str(if analysis_string.is_empty() {
+        if search_text.is_empty() {
+            "⚠️ No words in file"
+        } else {
+            "⚠️ No results in file"
+        }
+    } else {
+        &analysis_string
+    });
     buffer
 }
 
@@ -287,48 +324,69 @@ fn get_result_text(
     let pwd = pwd.borrow().clone();
     let analyses_count = analyses.len();
 
+    let mut results_count = 0;
     for analysis in analyses {
-        buffer.push_str(&format!(
-            "📁 File: {}\n",
-            analysis
-                .file
-                .as_ref()
-                .map(|file| diff_paths(file, &pwd)
-                    .unwrap_or_else(|| file.clone())
-                    .display()
-                    .to_string())
-                .unwrap_or_else(|| "<none>".to_string())
-        ));
-        buffer.push_str(&analysis_to_string(
+        let analysis_string = analysis_to_string(
             analysis,
             args.top_words,
             args.bottom_words,
+            args.hide_empty,
             search_text,
-        ));
-        if !search_text.is_empty() {
+        );
+        if !analysis_string.is_empty() {
+            results_count += 1;
+            buffer.push_str(&format!(
+                "📁 File: {}\n",
+                analysis
+                    .file
+                    .as_ref()
+                    .map(|file| diff_paths(file, &pwd)
+                        .unwrap_or_else(|| file.clone())
+                        .display()
+                        .to_string())
+                    .unwrap_or_else(|| "<none>".to_string())
+            ));
+            buffer.push_str(&analysis_string);
+            if !search_text.is_empty() {
+                buffer.push('\n');
+            }
             buffer.push('\n');
         }
-        buffer.push('\n');
     }
 
     if let Some(ref analysis) = total {
-        if analyses_count > 1 {
-            buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
-            buffer.push_str(&analysis_to_string(
+        if results_count > 1 {
+            let analysis_string = analysis_to_string(
                 analysis,
                 args.top_words,
                 args.bottom_words,
+                args.hide_empty,
                 search_text,
-            ));
+            );
+            if !analysis_string.is_empty() {
+                buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
+                buffer.push_str(&analysis_string);
+                buffer.push('\n');
+            }
             buffer.push('\n');
         }
 
-        buffer.push('\n');
-        buffer.push_str(&format!(
-            "📢 Summary of {} files (all words)\n",
-            analyses_count
-        ));
-        buffer.push_str(&analysis_to_string(analysis, 0, 0, search_text));
+        let analysis_string = analysis_to_string(analysis, 0, 0, args.hide_empty, search_text);
+        if !analysis_string.is_empty() {
+            buffer.push_str(&format!(
+                "📢 Summary of {} files (all words)\n",
+                analyses_count
+            ));
+            buffer.push_str(&analysis_string);
+        }
+    }
+
+    if buffer.is_empty() {
+        buffer.push_str(if search_text.is_empty() {
+            "⚠️ No words in files"
+        } else {
+            "⚠️ No results in files"
+        })
     }
 
     buffer
@@ -428,6 +486,28 @@ impl App {
         );
     }
 
+    fn menu_settings(&self) {
+        let args = self.args.borrow();
+        self.menu_settings_lowercase.set_checked(args.lowercase);
+        self.menu_settings_hide_empty.set_checked(args.hide_empty);
+    }
+    fn menu_settings_lowercase(&self) {
+        {
+            let mut args = self.args.borrow_mut();
+            args.lowercase = !args.lowercase;
+        }
+        let sources = self.last_source.borrow().clone();
+        self.start_analyze(sources);
+    }
+    fn menu_settings_hide_empty(&self) {
+        {
+            let mut args = self.args.borrow_mut();
+            args.hide_empty = !args.hide_empty;
+        }
+        let sources = self.last_source.borrow().clone();
+        self.start_analyze(sources);
+    }
+
     fn timertick(&self) {
         if let Ok(thread) = self.thread.try_borrow() {
             if thread.is_none() {
@@ -507,6 +587,7 @@ impl App {
         if thread.is_err() {
             return;
         }
+        *self.last_source.borrow_mut() = sources.clone();
         let mut thread = thread.unwrap();
 
         self.progress.set_state(nwg::ProgressBarState::Normal);
@@ -566,6 +647,7 @@ fn main() {
         bottom_words: 3,
         recursive: true,
         follow_symlinks: false,
+        hide_empty: true,
         outfile: None,
     };
     (*app.pwd.borrow_mut()) =
