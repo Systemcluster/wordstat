@@ -283,13 +283,7 @@ fn analysis_to_string(
             .into_iter()
             .filter(|(_, string)| string.to_lowercase().contains(&search_text.to_lowercase()))
             .collect();
-        let analysis_string = analysis_words_to_string(&tmp_analysis, top_words, bottom_words);
-        analysis_string
-            .lines()
-            .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
-            .map(String::from)
-            .reduce(|a, b| format!("{}\n{}", a, b))
-            .unwrap_or_default()
+        analysis_words_to_string(&tmp_analysis, top_words, bottom_words)
     };
     if analysis_string.is_empty() && hide_empty {
         return buffer;
@@ -307,16 +301,20 @@ fn analysis_to_string(
         "🔢 Word frequency standard deviation: {:.2}\n",
         analysis.word_dist_stddev
     ));
-    buffer.push_str("📈 Top words:\n");
-    buffer.push_str(if analysis_string.is_empty() {
-        if search_text.is_empty() {
+    if analysis_string.is_empty() {
+        buffer.push_str(if search_text.is_empty() {
             "⚠️ No words in file"
         } else {
             "⚠️ No results in file"
-        }
+        })
     } else {
-        &analysis_string
-    });
+        buffer.push_str("📈 Top words");
+        if !search_text.is_empty() {
+            buffer.push_str(" (filtered)")
+        }
+        buffer.push_str(":\n");
+        buffer.push_str(&analysis_string);
+    };
     buffer
 }
 
@@ -356,9 +354,6 @@ fn get_result_text(
                     .unwrap_or_else(|| "<none>".to_string())
             ));
             buffer.push_str(&analysis_string);
-            if !search_text.is_empty() {
-                buffer.push('\n');
-            }
             buffer.push('\n');
         }
     }
@@ -392,9 +387,9 @@ fn get_result_text(
 
     if buffer.is_empty() {
         buffer.push_str(if search_text.is_empty() {
-            "⚠️ No words in files"
+            "⚠️ No words in files\n"
         } else {
-            "⚠️ No results in files"
+            "⚠️ No results in files\n"
         })
     }
 
