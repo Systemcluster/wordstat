@@ -141,6 +141,7 @@ pub fn analyze<
     sources.par_iter().for_each(|source| {
         match source {
             AnalyzeSource::Content(content) => {
+                on_progress("Analyzing...".to_string());
                 tasks.lock().unwrap().push(pool.spawn(process(
                     AnalyzeSource::Content(content.to_owned()),
                     args.lowercase,

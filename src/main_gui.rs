@@ -576,6 +576,7 @@ impl App {
             &self.pwd,
             &self.search.text(),
         ));
+        self.status.set_text(0, "");
 
         self.progress.set_state(nwg::ProgressBarState::Paused);
         self.search.set_enabled(true);
