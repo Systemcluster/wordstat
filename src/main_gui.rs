@@ -75,7 +75,8 @@ const RECT_102: Rect<D> = Rect {
 };
 
 enum Message {
-    Text(String),
+    Status(String),
+    Results(String),
     End,
 }
 
@@ -190,6 +191,9 @@ pub struct App {
 
     tx: RefCell<Option<flume::Sender<Message>>>,
     tr: RefCell<Option<flume::Receiver<Message>>>,
+
+    last_result_thread: RefCell<Option<flume::Sender<bool>>>,
+
     control_pressed: Arc<AtomicBool>,
     #[allow(clippy::type_complexity)]
     thread: RefCell<Option<JoinHandle<(Vec<Analysis>, Option<Analysis>)>>>,
@@ -199,6 +203,131 @@ pub struct App {
     pwd: RefCell<PathBuf>,
 
     dpi: Arc<AtomicU32>,
+}
+
+fn get_result_text(
+    analyses: &RefCell<(Vec<Analysis>, Option<Analysis>)>,
+    args: &RefCell<Args>,
+    pwd: &RefCell<PathBuf>,
+    search_text: &str,
+) -> String {
+    let analyses = analyses.borrow();
+    let (analyses, total) = (&analyses.0, &analyses.1);
+    let mut buffer = String::new();
+    let args = args.borrow().clone();
+    let pwd = pwd.borrow().clone();
+    let analyses_count = analyses.len();
+
+    for analysis in analyses {
+        buffer.push_str(&format!(
+            "📁 File: {}\n",
+            analysis
+                .file
+                .as_ref()
+                .map(|file| diff_paths(file, &pwd)
+                    .unwrap_or_else(|| file.clone())
+                    .display()
+                    .to_string())
+                .unwrap_or_else(|| "<none>".to_string())
+        ));
+        buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+        buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+        buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+        buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
+        buffer.push_str("📈 Top words:\n");
+        if search_text.is_empty() {
+            let analysis_string = analysis_to_string(analysis, args.top_words, args.bottom_words);
+            buffer.push_str(&analysis_string);
+        } else {
+            let mut tmp_analysis = analysis.clone();
+            tmp_analysis.word_freq = tmp_analysis
+                .word_freq
+                .into_iter()
+                .filter(|(_, string)| string.to_lowercase().contains(&search_text.to_lowercase()))
+                .collect();
+            let analysis_string =
+                analysis_to_string(&tmp_analysis, args.top_words, args.bottom_words);
+            buffer.push_str(
+                &analysis_string
+                    .lines()
+                    .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
+                    .map(String::from)
+                    .reduce(|a, b| format!("{}\n{}", a, b))
+                    .unwrap_or_default(),
+            );
+            buffer.push('\n');
+        }
+        buffer.push('\n');
+    }
+
+    if let Some(ref analysis) = total {
+        if analyses_count > 1 {
+            buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
+            buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+            buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+            buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+            buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
+            buffer.push_str("📈 Top words:\n");
+            if search_text.is_empty() {
+                let analysis_string =
+                    analysis_to_string(analysis, args.top_words, args.bottom_words);
+                buffer.push_str(&analysis_string);
+            } else {
+                let mut tmp_analysis = analysis.clone();
+                tmp_analysis.word_freq = tmp_analysis
+                    .word_freq
+                    .into_iter()
+                    .filter(|(_, string)| {
+                        string.to_lowercase().contains(&search_text.to_lowercase())
+                    })
+                    .collect();
+                let analysis_string =
+                    analysis_to_string(&tmp_analysis, args.top_words, args.bottom_words);
+                buffer.push_str(
+                    &analysis_string
+                        .lines()
+                        .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
+                        .map(String::from)
+                        .reduce(|a, b| format!("{}\n{}", a, b))
+                        .unwrap_or_default(),
+                );
+            }
+            buffer.push('\n');
+        }
+
+        buffer.push('\n');
+        buffer.push_str(&format!(
+            "📢 Summary of {} files (all words)\n",
+            analyses_count
+        ));
+        buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
+        buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
+        buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
+        buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
+        buffer.push_str("📈 Top words:\n");
+        if search_text.is_empty() {
+            let analysis_string = analysis_to_string(analysis, 0, 0);
+            buffer.push_str(&analysis_string);
+        } else {
+            let mut tmp_analysis = analysis.clone();
+            tmp_analysis.word_freq = tmp_analysis
+                .word_freq
+                .into_iter()
+                .filter(|(_, string)| string.to_lowercase().contains(&search_text.to_lowercase()))
+                .collect();
+            let analysis_string = analysis_to_string(&tmp_analysis, 0, 0);
+            buffer.push_str(
+                &analysis_string
+                    .lines()
+                    .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
+                    .map(String::from)
+                    .reduce(|a, b| format!("{}\n{}", a, b))
+                    .unwrap_or_default(),
+            );
+        }
+    }
+
+    buffer
 }
 
 impl App {
@@ -257,7 +386,31 @@ impl App {
     }
 
     fn search(&self) {
-        self.update_text();
+        let last_result_thread = self.last_result_thread.take();
+        if let Some(last_result_thread) = last_result_thread {
+            let _ = last_result_thread.send(true);
+        }
+
+        let tx = self.tx.clone();
+        let analyses = self.analyses.clone();
+        let args = self.args.clone();
+        let pwd = self.pwd.clone();
+        let search = self.search.text();
+
+        let (result_tx, result_tr) = flume::bounded(1);
+        self.last_result_thread.replace(Some(result_tx));
+
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            if let Ok(true) = result_tr.try_recv() {
+                return;
+            }
+            let result = get_result_text(&analyses, &args, &pwd, &search);
+            if let Ok(true) = result_tr.try_recv() {
+                return;
+            }
+            let _ = tx.borrow().as_ref().unwrap().send(Message::Results(result));
+        });
     }
 
     fn drop(&self, data: &nwg::EventData) {
@@ -280,7 +433,8 @@ impl App {
         let tr = self.tr.borrow().clone().unwrap();
         while let Ok(message) = tr.try_recv() {
             match message {
-                Message::Text(message) => self.status.set_text(0, &message),
+                Message::Status(message) => self.status.set_text(0, &message),
+                Message::Results(results) => self.text.set_text(&results),
                 Message::End => self.complete_analyze(),
             };
         }
@@ -311,134 +465,6 @@ impl App {
         }
     }
 
-    pub fn update_text(&self) {
-        let analyses = self.analyses.borrow();
-        let (analyses, total) = (&analyses.0, &analyses.1);
-        let mut buffer = String::new();
-        let args = self.args.borrow().clone();
-        let pwd = self.pwd.borrow().clone();
-        let analyses_count = analyses.len();
-        let search_text = self.search.text();
-
-        for analysis in analyses {
-            buffer.push_str(&format!(
-                "📁 File: {}\n",
-                analysis
-                    .file
-                    .as_ref()
-                    .map(|file| diff_paths(file, &pwd)
-                        .unwrap_or_else(|| file.clone())
-                        .display()
-                        .to_string())
-                    .unwrap_or_else(|| "<none>".to_string())
-            ));
-            buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
-            buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
-            buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
-            buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
-            buffer.push_str("📈 Top words:\n");
-            if search_text.is_empty() {
-                let analysis_string =
-                    analysis_to_string(analysis, args.top_words, args.bottom_words);
-                buffer.push_str(&analysis_string);
-            } else {
-                let mut tmp_analysis = analysis.clone();
-                tmp_analysis.word_freq = tmp_analysis
-                    .word_freq
-                    .into_iter()
-                    .filter(|(_, string)| {
-                        string.to_lowercase().contains(&search_text.to_lowercase())
-                    })
-                    .collect();
-                let analysis_string =
-                    analysis_to_string(&tmp_analysis, args.top_words, args.bottom_words);
-                buffer.push_str(
-                    &analysis_string
-                        .lines()
-                        .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
-                        .map(String::from)
-                        .reduce(|a, b| format!("{}\n{}", a, b))
-                        .unwrap_or_default(),
-                );
-                buffer.push('\n');
-            }
-            buffer.push('\n');
-        }
-
-        if let Some(ref analysis) = total {
-            if analyses_count > 1 {
-                buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
-                buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
-                buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
-                buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
-                buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
-                buffer.push_str("📈 Top words:\n");
-                if search_text.is_empty() {
-                    let analysis_string =
-                        analysis_to_string(analysis, args.top_words, args.bottom_words);
-                    buffer.push_str(&analysis_string);
-                } else {
-                    let mut tmp_analysis = analysis.clone();
-                    tmp_analysis.word_freq = tmp_analysis
-                        .word_freq
-                        .into_iter()
-                        .filter(|(_, string)| {
-                            string.to_lowercase().contains(&search_text.to_lowercase())
-                        })
-                        .collect();
-                    let analysis_string =
-                        analysis_to_string(&tmp_analysis, args.top_words, args.bottom_words);
-                    buffer.push_str(
-                        &analysis_string
-                            .lines()
-                            .filter(|line| {
-                                line.to_lowercase().contains(&search_text.to_lowercase())
-                            })
-                            .map(String::from)
-                            .reduce(|a, b| format!("{}\n{}", a, b))
-                            .unwrap_or_default(),
-                    );
-                }
-                buffer.push('\n');
-            }
-
-            buffer.push('\n');
-            buffer.push_str(&format!(
-                "📢 Summary of {} files (all words)\n",
-                analyses_count
-            ));
-            buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
-            buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
-            buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
-            buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
-            buffer.push_str("📈 Top words:\n");
-            if search_text.is_empty() {
-                let analysis_string = analysis_to_string(analysis, 0, 0);
-                buffer.push_str(&analysis_string);
-            } else {
-                let mut tmp_analysis = analysis.clone();
-                tmp_analysis.word_freq = tmp_analysis
-                    .word_freq
-                    .into_iter()
-                    .filter(|(_, string)| {
-                        string.to_lowercase().contains(&search_text.to_lowercase())
-                    })
-                    .collect();
-                let analysis_string = analysis_to_string(&tmp_analysis, 0, 0);
-                buffer.push_str(
-                    &analysis_string
-                        .lines()
-                        .filter(|line| line.to_lowercase().contains(&search_text.to_lowercase()))
-                        .map(String::from)
-                        .reduce(|a, b| format!("{}\n{}", a, b))
-                        .unwrap_or_default(),
-                );
-            }
-        }
-
-        self.text.set_text(&buffer);
-    }
-
     pub fn complete_analyze(&self) {
         let thread = self.thread.try_borrow_mut();
         if thread.is_err() {
@@ -460,7 +486,12 @@ impl App {
         }
         (*self.analyses.borrow_mut()) = (analyses, total);
 
-        self.update_text();
+        self.text.set_text(&get_result_text(
+            &self.analyses,
+            &self.args,
+            &self.pwd,
+            &self.search.text(),
+        ));
 
         self.progress.set_state(nwg::ProgressBarState::Paused);
         self.search.set_enabled(true);
@@ -488,13 +519,13 @@ impl App {
                 &args,
                 &pwd,
                 |error| {
-                    let _ = tx.send(Message::Text(error));
+                    let _ = tx.send(Message::Status(error));
                 },
                 |message| {
-                    let _ = tx.send(Message::Text(message));
+                    let _ = tx.send(Message::Status(message));
                 },
                 |message| {
-                    let _ = tx.send(Message::Text(message));
+                    let _ = tx.send(Message::Status(message));
                 },
                 |_| (),
             );
