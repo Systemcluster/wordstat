@@ -22,7 +22,6 @@ use std::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
-    thread::JoinHandle,
     time::Duration,
 };
 
@@ -76,8 +75,9 @@ const RECT_102: Rect<D> = Rect {
 
 enum Message {
     Status(String),
+    Waiting,
+    Analyses((Vec<Analysis>, Option<Analysis>)),
     Results(String),
-    End,
 }
 
 #[derive(Default, NwgUi)]
@@ -230,8 +230,6 @@ pub struct App {
     last_result_thread: RefCell<Option<flume::Sender<bool>>>,
 
     control_pressed: Arc<AtomicBool>,
-    #[allow(clippy::type_complexity)]
-    thread: RefCell<Option<JoinHandle<(Vec<Analysis>, Option<Analysis>)>>>,
     analyses: RefCell<(Vec<Analysis>, Option<Analysis>)>,
 
     args: RefCell<Args>,
@@ -368,12 +366,11 @@ fn analysis_to_string(
 }
 
 fn get_result_text(
-    analyses: &RefCell<(Vec<Analysis>, Option<Analysis>)>,
+    analyses: &(Vec<Analysis>, Option<Analysis>),
     args: &RefCell<Args>,
     pwd: &RefCell<PathBuf>,
     search_text: &str,
 ) -> String {
-    let analyses = analyses.borrow();
     let (analyses, total) = (&analyses.0, &analyses.1);
     let mut buffer = String::new();
     let args = args.borrow().clone();
@@ -521,7 +518,8 @@ impl App {
             if let Ok(true) = result_tr.try_recv() {
                 return;
             }
-            let result = get_result_text(&analyses, &args, &pwd, &search);
+            let _ = tx.borrow().as_ref().unwrap().send(Message::Waiting);
+            let result = get_result_text(&analyses.borrow(), &args, &pwd, &search);
             if let Ok(true) = result_tr.try_recv() {
                 return;
             }
@@ -572,17 +570,21 @@ impl App {
     }
 
     fn timertick(&self) {
-        if let Ok(thread) = self.thread.try_borrow() {
-            if thread.is_none() {
-                self.progress.set_state(nwg::ProgressBarState::Paused);
-            }
-        }
         let tr = self.tr.borrow().clone().unwrap();
         while let Ok(message) = tr.try_recv() {
             match message {
                 Message::Status(message) => self.status.set_text(0, &message),
-                Message::Results(results) => self.text.set_text(&results),
-                Message::End => self.complete_analyze(),
+                Message::Analyses(analyses) => {
+                    self.analyses.replace(analyses);
+                }
+                Message::Waiting => self.progress.set_state(nwg::ProgressBarState::Normal),
+                Message::Results(results) => {
+                    self.text.set_text(&results);
+                    self.progress.set_state(nwg::ProgressBarState::Paused);
+                    self.search.set_enabled(true);
+                    self.status.set_text(0, "");
+                    self.window.invalidate();
+                }
             };
         }
     }
@@ -612,40 +614,8 @@ impl App {
         }
     }
 
-    pub fn complete_analyze(&self) {
-        let thread = self.thread.try_borrow_mut();
-        if thread.is_err() {
-            return;
-        }
-        let mut thread = thread.unwrap();
-        if thread.is_none() {
-            return;
-        }
-        let thread = thread.take().unwrap();
-
-        let (analyses, total) = thread.join().unwrap();
-        (*self.analyses.borrow_mut()) = (analyses, total);
-
-        self.text.set_text(&get_result_text(
-            &self.analyses,
-            &self.args,
-            &self.pwd,
-            &self.search.text(),
-        ));
-        self.status.set_text(0, "");
-
-        self.progress.set_state(nwg::ProgressBarState::Paused);
-        self.search.set_enabled(true);
-        self.window.invalidate();
-    }
-
     pub fn start_analyze(&self, sources: Vec<AnalyzeSource>) {
-        let thread = self.thread.try_borrow_mut();
-        if thread.is_err() {
-            return;
-        }
         *self.last_source.borrow_mut() = sources.clone();
-        let mut thread = thread.unwrap();
 
         self.progress.set_state(nwg::ProgressBarState::Normal);
         self.search.set_enabled(false);
@@ -653,13 +623,14 @@ impl App {
         self.window.invalidate();
 
         let tx = self.tx.borrow().clone().unwrap();
-        let args = self.args.borrow().clone();
-        let pwd = self.pwd.borrow().clone();
-        *thread = Some(std::thread::spawn(move || {
-            let result = analyze(
+        let args = self.args.clone();
+        let pwd = self.pwd.clone();
+        let search_text = self.search.text();
+        std::thread::spawn(move || {
+            let analyses = analyze(
                 &sources,
-                &args,
-                &pwd,
+                &args.borrow(),
+                &pwd.borrow(),
                 |error| {
                     let _ = tx.send(Message::Status(error));
                 },
@@ -671,9 +642,15 @@ impl App {
                 },
                 |_| (),
             );
-            let _ = tx.send(Message::End);
-            result
-        }));
+            let _ = tx.send(Message::Status("Generating report...".to_owned()));
+            let _ = tx.send(Message::Analyses(analyses.clone()));
+            let _ = tx.send(Message::Results(get_result_text(
+                &analyses,
+                &args,
+                &pwd,
+                &search_text,
+            )));
+        });
     }
 }
 
