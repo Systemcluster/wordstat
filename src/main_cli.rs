@@ -237,7 +237,7 @@ fn main() {
         emojis: args.emojis,
     };
 
-    let (analyses, total) = analyze(
+    let (mut analyses, total) = analyze(
         &paths
             .iter()
             .map(|path| AnalyzeSource::Path(path.to_owned()))
@@ -250,6 +250,7 @@ fn main() {
         |delta| bar_progress.inc(delta),
     );
     let analyses_count = analyses.len();
+    analyses.sort_by_key(|analysis| analysis.file.clone());
 
     bar_progress.finish_and_clear();
 

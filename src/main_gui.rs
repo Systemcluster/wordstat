@@ -627,7 +627,7 @@ impl App {
         let pwd = self.pwd.clone();
         let search_text = self.search.text();
         std::thread::spawn(move || {
-            let analyses = analyze(
+            let mut analyses = analyze(
                 &sources,
                 &args.borrow(),
                 &pwd.borrow(),
@@ -642,6 +642,7 @@ impl App {
                 },
                 |_| (),
             );
+            analyses.0.sort_by_key(|analysis| analysis.file.clone());
             let _ = tx.send(Message::Status("Generating report...".to_owned()));
             let _ = tx.send(Message::Analyses(analyses.clone()));
             let _ = tx.send(Message::Results(get_result_text(
