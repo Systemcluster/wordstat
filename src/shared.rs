@@ -43,6 +43,7 @@ pub struct Args {
     pub follow_symlinks: bool,
     pub outfile: Option<String>,
     pub hide_empty: bool,
+    pub emojis: bool,
 }
 
 fn update_dists(analysis: &mut Analysis) {

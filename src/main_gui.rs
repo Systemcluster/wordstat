@@ -107,7 +107,7 @@ pub struct App {
     )]
     menu_settings: nwg::Menu,
     #[nwg_control(
-        text: "&Lowercase Words",
+        text: "&Lowercase words",
         parent: menu_settings,
         check: false
     )]
@@ -116,7 +116,7 @@ pub struct App {
     )]
     menu_settings_lowercase: nwg::MenuItem,
     #[nwg_control(
-        text: "&Hide Empty Sources",
+        text: "&Hide empty sources",
         parent: menu_settings,
         check: false
     )]
@@ -124,6 +124,15 @@ pub struct App {
         OnMenuItemSelected: [App::menu_settings_hide_empty],
     )]
     menu_settings_hide_empty: nwg::MenuItem,
+    #[nwg_control(
+        text: "Show matching &emojis",
+        parent: menu_settings,
+        check: false
+    )]
+    #[nwg_events(
+        OnMenuItemSelected: [App::menu_settings_emojis],
+    )]
+    menu_settings_emojis: nwg::MenuItem,
 
     #[nwg_layout(
         parent: window,
@@ -236,6 +245,7 @@ fn analysis_words_to_string(
     analysis: &Analysis,
     top_words: usize,
     bottom_words: usize,
+    emojis: bool,
 ) -> (String, String) {
     if analysis.word_freq.is_empty() {
         return ("".to_owned(), "".to_owned());
@@ -249,6 +259,11 @@ fn analysis_words_to_string(
         buffer.push_str(&format!("  {:width$}", freq, width = pad));
         buffer.push_str(": ");
         buffer.push_str(string);
+        if emojis {
+            if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                buffer.push_str(&format!(" {}", e));
+            }
+        }
         buffer.push('\n');
     }
     let mut buffer_bottom = String::new();
@@ -274,6 +289,9 @@ fn analysis_words_to_string(
             buffer_bottom.push_str(&format!("  {:width$}", freq, width = pad));
             buffer_bottom.push_str(": ");
             buffer_bottom.push_str(string);
+            if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                buffer.push_str(&format!(" {}", e));
+            }
             buffer_bottom.push('\n');
         }
     }
@@ -286,10 +304,11 @@ fn analysis_to_string(
     bottom_words: usize,
     hide_empty: bool,
     search_text: &str,
+    emojis: bool,
 ) -> String {
     let mut buffer = String::new();
     let (analysis_string, analysis_string_bottom) = if search_text.is_empty() {
-        analysis_words_to_string(analysis, top_words, bottom_words)
+        analysis_words_to_string(analysis, top_words, bottom_words, emojis)
     } else {
         let mut tmp_analysis = analysis.clone();
         tmp_analysis.word_freq = tmp_analysis
@@ -297,7 +316,7 @@ fn analysis_to_string(
             .into_iter()
             .filter(|(_, string)| string.to_lowercase().contains(&search_text.to_lowercase()))
             .collect();
-        analysis_words_to_string(&tmp_analysis, top_words, bottom_words)
+        analysis_words_to_string(&tmp_analysis, top_words, bottom_words, emojis)
     };
     if analysis_string.is_empty() && hide_empty {
         return buffer;
@@ -369,6 +388,7 @@ fn get_result_text(
             args.bottom_words,
             args.hide_empty,
             search_text,
+            args.emojis,
         );
         if !analysis_string.is_empty() {
             results_count += 1;
@@ -396,6 +416,7 @@ fn get_result_text(
                 args.bottom_words,
                 args.hide_empty,
                 search_text,
+                args.emojis,
             );
             if !analysis_string.is_empty() {
                 buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
@@ -405,7 +426,8 @@ fn get_result_text(
             buffer.push('\n');
         }
 
-        let analysis_string = analysis_to_string(analysis, 0, 0, args.hide_empty, search_text);
+        let analysis_string =
+            analysis_to_string(analysis, 0, 0, args.hide_empty, search_text, args.emojis);
         if !analysis_string.is_empty() {
             buffer.push_str(&format!(
                 "📢 Summary of {} files (all words)\n",
@@ -522,6 +544,7 @@ impl App {
         let args = self.args.borrow();
         self.menu_settings_lowercase.set_checked(args.lowercase);
         self.menu_settings_hide_empty.set_checked(args.hide_empty);
+        self.menu_settings_emojis.set_checked(args.emojis);
     }
     fn menu_settings_lowercase(&self) {
         {
@@ -535,6 +558,14 @@ impl App {
         {
             let mut args = self.args.borrow_mut();
             args.hide_empty = !args.hide_empty;
+        }
+        let sources = self.last_source.borrow().clone();
+        self.start_analyze(sources);
+    }
+    fn menu_settings_emojis(&self) {
+        {
+            let mut args = self.args.borrow_mut();
+            args.emojis = !args.emojis;
         }
         let sources = self.last_source.borrow().clone();
         self.start_analyze(sources);
@@ -675,6 +706,7 @@ fn main() {
         follow_symlinks: false,
         hide_empty: true,
         outfile: None,
+        emojis: false,
     };
     (*app.pwd.borrow_mut()) =
         canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))

@@ -46,6 +46,7 @@ opt-level = 3
 bumpalo = {version = "3"}
 byteorder = {version = "1"}
 dashmap = {version = "5"}
+emojis = {version = "0.2"}
 entangled = {version = "1"}
 futures = {version = "0.3"}
 num_cpus = {version = "1"}

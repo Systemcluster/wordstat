@@ -25,6 +25,7 @@ fn bench_examples(bencher: &mut Bench) {
         follow_symlinks: false,
         hide_empty: false,
         outfile: None,
+        emojis: false,
     };
     let pwd = std::fs::canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))
         .unwrap_or_else(|_| PathBuf::new());

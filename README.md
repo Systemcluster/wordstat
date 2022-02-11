@@ -26,6 +26,7 @@ ARGS:
 
 OPTIONS:
     -b, --bottom-words <BOTTOM_WORDS>    Number of least occuring words to show [default: 3]
+    -e, --emojis                         Show matching emojis for words
     -f, --follow-symlinks                Follow symlinks
     -h, --help                           Print help information
     -l, --lowercase                      Normalize casing by lowercasing each occuring word

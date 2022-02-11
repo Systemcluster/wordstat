@@ -35,6 +35,9 @@ pub struct CliArgs {
     /// Number of least occuring words to show
     #[clap(short, long, default_value_t = 3)]
     bottom_words: usize,
+    /// Show matching emojis for words
+    #[clap(short, long)]
+    emojis: bool,
     /// Iterate through subdirectories
     #[clap(short, long)]
     recursive: bool,
@@ -46,7 +49,7 @@ pub struct CliArgs {
     outfile: Option<String>,
 }
 
-fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
+fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize, emojis: bool) {
     if analysis.word_freq.is_empty() {
         eprintln!("{}{}", Emoji("⚠️ ", ""), style("No words in file").red());
         return;
@@ -102,13 +105,19 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
         if top_words > 0 && i >= top_words {
             break;
         };
-        println!(
+        print!(
             "  {}: {}",
             style(&format!("{:width$}", freq, width = pad))
                 .bold()
                 .blue(),
             style(string).green(),
         );
+        if emojis {
+            if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                print!(" {}", e);
+            }
+        }
+        println!();
     }
     if bottom_words > 0 && top_words != 0 && top_words < analysis.word_count {
         let pad = format!(
@@ -126,13 +135,19 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize) {
             if bottom_words > 0 && i >= bottom_words {
                 break;
             };
-            println!(
+            print!(
                 "  {}: {}",
                 style(&format!("{:width$}", freq, width = pad))
                     .bold()
                     .blue(),
                 style(string).green(),
             );
+            if emojis {
+                if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                    print!(" {}", e);
+                }
+            }
+            println!();
         }
     }
 }
@@ -219,6 +234,7 @@ fn main() {
         follow_symlinks: args.follow_symlinks,
         hide_empty: false,
         outfile: args.outfile,
+        emojis: args.emojis,
     };
 
     let (analyses, total) = analyze(
@@ -254,7 +270,7 @@ fn main() {
             )
             .blue()
         );
-        print_analysis(analysis, args.top_words, args.bottom_words);
+        print_analysis(analysis, args.top_words, args.bottom_words, args.emojis);
     }
 
     if let Some(analysis) = total {
@@ -267,7 +283,7 @@ fn main() {
                 style(&format!("{}", analyses_count)).bold().magenta(),
                 style("files").yellow()
             );
-            print_analysis(&analysis, args.top_words, args.bottom_words);
+            print_analysis(&analysis, args.top_words, args.bottom_words, args.emojis);
         }
 
         if let Some(path) = args.outfile {
