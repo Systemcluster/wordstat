@@ -329,6 +329,7 @@ impl App {
             if let Ok(true) = result_tr.try_recv() {
                 return;
             }
+            let result = result.unwrap_or_else(|e| "⚠️ ".to_string() + &e.to_string());
             let _ = tx.borrow().as_ref().unwrap().send(Message::Results(result));
         });
     }
@@ -461,12 +462,10 @@ impl App {
             analyses.0.sort_by_key(|analysis| analysis.file.clone());
             let _ = tx.send(Message::Status("Generating report...".to_owned()));
             let _ = tx.send(Message::Analyses(analyses.clone()));
-            let _ = tx.send(Message::Results(get_result_text(
-                &analyses,
-                &args,
-                &pwd,
-                &search_text,
-            )));
+            let _ = tx.send(Message::Results(
+                get_result_text(&analyses, &args, &pwd, &search_text)
+                    .unwrap_or_else(|e| "⚠️ ".to_string() + &e.to_string()),
+            ));
         });
     }
 }

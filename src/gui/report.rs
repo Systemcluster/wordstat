@@ -1,7 +1,9 @@
 use std::{cell::RefCell, path::PathBuf};
 
+use anyhow::Result;
 use pathdiff::diff_paths;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use regex::{Regex, RegexBuilder};
 
 use super::shared::{Analysis, Args};
 
@@ -25,7 +27,7 @@ pub fn analysis_words_to_string(
         buffer.push_str(string);
         if emojis {
             if let Some(e) = emojis::lookup(&string.to_lowercase()) {
-                buffer.push_str(&format!(" {}", e));
+                buffer.push_str(format!(" {}", e).trim());
             }
         }
         buffer.push('\n');
@@ -53,8 +55,11 @@ pub fn analysis_words_to_string(
             buffer_bottom.push_str(&format!("  {:width$}", freq, width = pad));
             buffer_bottom.push_str(": ");
             buffer_bottom.push_str(string);
-            if let Some(e) = emojis::lookup(&string.to_lowercase()) {
-                buffer.push_str(&format!(" {}", e));
+
+            if emojis {
+                if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                    buffer_bottom.push_str(format!(" {}", e).trim());
+                }
             }
             buffer_bottom.push('\n');
         }
@@ -67,18 +72,19 @@ pub fn analysis_to_string(
     top_words: usize,
     bottom_words: usize,
     hide_empty: bool,
-    search_text: &str,
+    search_regex: &Option<Regex>,
     emojis: bool,
 ) -> String {
     let mut buffer = String::new();
-    let (analysis_string, analysis_string_bottom) = if search_text.is_empty() {
+    let (analysis_string, analysis_string_bottom) = if search_regex.is_none() {
         analysis_words_to_string(analysis, top_words, bottom_words, emojis)
     } else {
+        let regex = search_regex.as_ref().unwrap();
         let mut tmp_analysis = analysis.clone();
         tmp_analysis.word_freq = tmp_analysis
             .word_freq
             .into_iter()
-            .filter(|(_, string)| string.to_lowercase().contains(&search_text.to_lowercase()))
+            .filter(|(_, string)| regex.is_match(string))
             .collect();
         analysis_words_to_string(&tmp_analysis, top_words, bottom_words, emojis)
     };
@@ -107,21 +113,21 @@ pub fn analysis_to_string(
         analysis.word_dist_mode
     ));
     if analysis_string.is_empty() {
-        buffer.push_str(if search_text.is_empty() {
+        buffer.push_str(if search_regex.is_none() {
             "⚠️ No words in file"
         } else {
             "⚠️ No results in file"
         })
     } else {
         buffer.push_str("📈 Top words");
-        if !search_text.is_empty() {
+        if !search_regex.is_none() {
             buffer.push_str(" (filtered)")
         }
         buffer.push_str(":\n");
         buffer.push_str(&analysis_string);
         if !analysis_string_bottom.is_empty() {
             buffer.push_str("📉 Bottom words");
-            if !search_text.is_empty() {
+            if !search_regex.is_none() {
                 buffer.push_str(" (filtered)")
             }
             buffer.push_str(":\n");
@@ -136,13 +142,36 @@ pub fn get_result_text(
     args: &RefCell<Args>,
     pwd: &RefCell<PathBuf>,
     search_text: &str,
-) -> String {
+) -> Result<String> {
     let (analyses, total) = (&analyses.0, &analyses.1);
     let mut buffer = String::new();
     let args = args.borrow().clone();
     let pwd = pwd.borrow().clone();
     let analyses_count = analyses.len();
 
+    let search_is_regex = search_text.len() >= 3
+        && search_text.starts_with('/')
+        && (search_text.ends_with('/') || search_text.ends_with("/i"));
+    let is_insensitive = search_text.ends_with("/i");
+    let regex = if search_text.is_empty() {
+        None
+    } else if search_is_regex {
+        Some(
+            RegexBuilder::new(
+                &search_text[1..search_text.len() - if is_insensitive { 2 } else { 1 }],
+            )
+            .case_insensitive(search_text.ends_with("/i"))
+            .multi_line(false)
+            .build()?,
+        )
+    } else {
+        Some(
+            RegexBuilder::new(&regex::escape(search_text))
+                .case_insensitive(true)
+                .multi_line(false)
+                .build()?,
+        )
+    };
     let mut results_texts = analyses
         .into_par_iter()
         .filter_map(|analysis| {
@@ -151,7 +180,7 @@ pub fn get_result_text(
                 args.top_words,
                 args.bottom_words,
                 args.hide_empty,
-                search_text,
+                &regex,
                 args.emojis,
             );
             if !analysis_string.is_empty() {
@@ -188,7 +217,7 @@ pub fn get_result_text(
                 args.top_words,
                 args.bottom_words,
                 args.hide_empty,
-                search_text,
+                &regex,
                 args.emojis,
             );
             if !analysis_string.is_empty() {
@@ -220,5 +249,5 @@ pub fn get_result_text(
         })
     }
 
-    buffer.replace("\r\n", "\n").replace('\n', "\r\n")
+    Ok(buffer.replace("\r\n", "\n").replace('\n', "\r\n"))
 }

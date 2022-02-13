@@ -19,6 +19,7 @@ fn bench_examples(bencher: &mut Bench) {
         recursive: true,
         follow_symlinks: false,
         hide_empty: false,
+        show_all_words: false,
         outfile: None,
         emojis: false,
     };

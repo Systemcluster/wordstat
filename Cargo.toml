@@ -49,6 +49,7 @@ opt-level = 3
 
 [dependencies]
 
+anyhow = {version = "1"}
 bumpalo = {version = "3"}
 byteorder = {version = "1"}
 dashmap = {version = "5"}
@@ -59,6 +60,7 @@ num_cpus = {version = "1"}
 parking_lot = {version = "0.12"}
 pathdiff = {version = "0.2"}
 rayon = {version = "1"}
+regex = {version = "1"}
 unicode-segmentation = {version = "1"}
 walkdir = {version = "2"}
 
@@ -73,7 +75,7 @@ clap = {version = "3", features = [
   "wrap_help",
 ], optional = true}
 console = {version = "0.15", optional = true}
-indicatif = {version = "0.17.0-rc.2", optional = true}
+indicatif = {version = "0.17.0-rc.4", optional = true}
 wild = {version = "2.1.0-alpha.2", optional = true}
 
 flume = {version = "0.10", optional = true}
