@@ -244,7 +244,7 @@ pub fn get_result_text(
             buffer.push('\n');
         }
 
-        if args.show_all_words && printed_total < filtered_word_count {
+        if args.show_all_words && (printed_total < filtered_word_count || results_count == 1) {
             let (analysis_string, _, _) =
                 analysis_to_string(analysis, 0, 0, args.hide_empty, &regex, args.emojis);
             if !analysis_string.is_empty() {

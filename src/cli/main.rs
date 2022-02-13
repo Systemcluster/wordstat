@@ -407,7 +407,7 @@ fn main() {
         } else {
             (0, 0)
         };
-        if args.show_all_words && printed_total < filtered_word_count {
+        if args.show_all_words && (printed_total < filtered_word_count || analyses_count == 1) {
             println!();
             println!(
                 "{}{} {} {}",
