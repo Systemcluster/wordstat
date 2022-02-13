@@ -33,6 +33,7 @@ use nwg::stretch::{
 use nwg::NativeUi;
 
 use pathdiff::diff_paths;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use winapi::{
     shared::windef::HWND,
     um::{
@@ -377,32 +378,42 @@ fn get_result_text(
     let pwd = pwd.borrow().clone();
     let analyses_count = analyses.len();
 
-    let mut results_count = 0;
-    for analysis in analyses {
-        let analysis_string = analysis_to_string(
-            analysis,
-            args.top_words,
-            args.bottom_words,
-            args.hide_empty,
-            search_text,
-            args.emojis,
-        );
-        if !analysis_string.is_empty() {
-            results_count += 1;
-            buffer.push_str(&format!(
-                "📁 File: {}\n",
-                analysis
-                    .file
-                    .as_ref()
-                    .map(|file| diff_paths(file, &pwd)
-                        .unwrap_or_else(|| file.clone())
-                        .display()
-                        .to_string())
-                    .unwrap_or_else(|| "<none>".to_string())
-            ));
-            buffer.push_str(&analysis_string);
-            buffer.push('\n');
-        }
+    let mut results_texts = analyses
+        .into_par_iter()
+        .filter_map(|analysis| {
+            let analysis_string = analysis_to_string(
+                analysis,
+                args.top_words,
+                args.bottom_words,
+                args.hide_empty,
+                search_text,
+                args.emojis,
+            );
+            if !analysis_string.is_empty() {
+                Some((
+                    analysis.file.as_ref(),
+                    format!(
+                        "📁 File: {}\n",
+                        analysis
+                            .file
+                            .as_ref()
+                            .map(|file| diff_paths(file, &pwd)
+                                .unwrap_or_else(|| file.clone())
+                                .display()
+                                .to_string())
+                            .unwrap_or_else(|| "<none>".to_string())
+                    ) + &analysis_string
+                        + "\n",
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    results_texts.sort_by_key(|(file, _)| *file);
+    let results_count = results_texts.len();
+    for (_, texts) in results_texts.into_iter() {
+        buffer.push_str(&texts);
     }
 
     if let Some(ref analysis) = total {
