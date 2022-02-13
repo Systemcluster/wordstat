@@ -77,7 +77,7 @@ enum Message {
     Status(String),
     Waiting,
     Analyses((Vec<Analysis>, Option<Analysis>)),
-    Results(String),
+    Results((String, String)),
 }
 
 #[derive(Default, NwgUi)]
@@ -314,7 +314,7 @@ impl App {
         let analyses = self.analyses.clone();
         let args = self.args.clone();
         let pwd = self.pwd.clone();
-        let search = self.search.text();
+        let search_text = self.search.text();
 
         let (result_tx, result_tr) = flume::bounded(1);
         self.last_result_thread.replace(Some(result_tx));
@@ -325,12 +325,16 @@ impl App {
                 return;
             }
             let _ = tx.borrow().as_ref().unwrap().send(Message::Waiting);
-            let result = get_result_text(&analyses.borrow(), &args, &pwd, &search);
+            let result = get_result_text(&analyses.borrow(), &args, &pwd, &search_text);
             if let Ok(true) = result_tr.try_recv() {
                 return;
             }
             let result = result.unwrap_or_else(|e| "⚠️ ".to_string() + &e.to_string());
-            let _ = tx.borrow().as_ref().unwrap().send(Message::Results(result));
+            let _ = tx
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .send(Message::Results((result, search_text)));
         });
     }
 
@@ -395,12 +399,14 @@ impl App {
                     self.analyses.replace(analyses);
                 }
                 Message::Waiting => self.progress.set_state(nwg::ProgressBarState::Normal),
-                Message::Results(results) => {
-                    self.text.set_text(&results);
-                    self.progress.set_state(nwg::ProgressBarState::Paused);
-                    self.search.set_enabled(true);
-                    self.status.set_text(0, "");
-                    self.window.invalidate();
+                Message::Results((results, search_text)) => {
+                    if search_text == self.search.text() {
+                        self.text.set_text(&results);
+                        self.progress.set_state(nwg::ProgressBarState::Paused);
+                        self.search.set_enabled(true);
+                        self.status.set_text(0, "");
+                        self.window.invalidate();
+                    }
                 }
             };
         }
@@ -462,10 +468,11 @@ impl App {
             analyses.0.sort_by_key(|analysis| analysis.file.clone());
             let _ = tx.send(Message::Status("Generating report...".to_owned()));
             let _ = tx.send(Message::Analyses(analyses.clone()));
-            let _ = tx.send(Message::Results(
+            let _ = tx.send(Message::Results((
                 get_result_text(&analyses, &args, &pwd, &search_text)
                     .unwrap_or_else(|e| "⚠️ ".to_string() + &e.to_string()),
-            ));
+                search_text,
+            )));
         });
     }
 }
