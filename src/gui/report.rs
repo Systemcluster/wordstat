@@ -199,14 +199,16 @@ pub fn get_result_text(
             buffer.push('\n');
         }
 
-        let analysis_string =
-            analysis_to_string(analysis, 0, 0, args.hide_empty, search_text, args.emojis);
-        if !analysis_string.is_empty() {
-            buffer.push_str(&format!(
-                "📢 Summary of {} files (all words)\n",
-                analyses_count
-            ));
-            buffer.push_str(&analysis_string);
+        if args.show_all_words {
+            let analysis_string =
+                analysis_to_string(analysis, 0, 0, args.hide_empty, &regex, args.emojis);
+            if !analysis_string.is_empty() {
+                buffer.push_str(&format!(
+                    "📢 Summary of {} files (all words)\n",
+                    analyses_count
+                ));
+                buffer.push_str(&analysis_string);
+            }
         }
     }
 

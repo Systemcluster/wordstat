@@ -28,15 +28,18 @@ pub struct CliArgs {
     /// Normalize casing by lowercasing each occuring word
     #[clap(short, long)]
     lowercase: bool,
-    /// Number of top words to show (0 = all)
+    /// Number of top words to show per file (0 = all)
     #[clap(short, long, default_value_t = 10)]
     top_words: usize,
-    /// Number of least occuring words to show
+    /// Number of least occuring words to show per file
     #[clap(short, long, default_value_t = 3)]
     bottom_words: usize,
     /// Show matching emojis for words
     #[clap(short, long)]
     emojis: bool,
+    /// Print combined analysis with all words found in files
+    #[clap(short, long)]
+    show_all_words: bool,
     /// Iterate through subdirectories
     #[clap(short, long)]
     recursive: bool,
@@ -234,6 +237,7 @@ fn main() {
         hide_empty: false,
         outfile: args.outfile,
         emojis: args.emojis,
+        show_all_words: args.show_all_words,
     };
 
     let (mut analyses, total) = analyze(
@@ -284,6 +288,18 @@ fn main() {
                 style("files").yellow()
             );
             print_analysis(&analysis, args.top_words, args.bottom_words, args.emojis);
+        }
+
+        if args.show_all_words {
+            println!();
+            println!(
+                "{}{} {} {}",
+                Emoji("📢 ", ""),
+                style("Summary of").yellow(),
+                style(&format!("{}", analyses_count)).bold().magenta(),
+                style("files (all words)").yellow()
+            );
+            print_analysis(&analysis, 0, 0, args.emojis);
         }
 
         if let Some(path) = args.outfile {

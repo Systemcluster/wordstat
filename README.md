@@ -25,14 +25,15 @@ ARGS:
     <PATH>...    Path to one or multiple files or directories of files to analyze
 
 OPTIONS:
-    -b, --bottom-words <BOTTOM_WORDS>    Number of least occuring words to show [default: 3]
+    -b, --bottom-words <BOTTOM_WORDS>    Number of least occuring words to show per file [default: 3]
     -e, --emojis                         Show matching emojis for words
     -f, --follow-symlinks                Follow symlinks
     -h, --help                           Print help information
     -l, --lowercase                      Normalize casing by lowercasing each occuring word
     -o, --outfile <OUTFILE>              The path to a file that the results will be written to, will overwrite if it already exists
     -r, --recursive                      Iterate through subdirectories
-    -t, --top-words <TOP_WORDS>          Number of top words to show (0 = all) [default: 10]
+    -s, --show-all-words                 Print combined analysis with all words found in files
+    -t, --top-words <TOP_WORDS>          Number of top words to show per file (0 = all) [default: 10]
     -V, --version                        Print version information
 ```
 

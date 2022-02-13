@@ -47,6 +47,7 @@ pub struct Args {
     pub outfile: Option<String>,
     pub hide_empty: bool,
     pub emojis: bool,
+    pub show_all_words: bool,
 }
 
 fn update_dists(analysis: &mut Analysis) {

@@ -133,6 +133,15 @@ pub struct App {
         OnMenuItemSelected: [App::menu_settings_emojis],
     )]
     menu_settings_emojis: nwg::MenuItem,
+    #[nwg_control(
+        text: "Show summary with &all words",
+        parent: menu_settings,
+        check: false
+    )]
+    #[nwg_events(
+        OnMenuItemSelected: [App::menu_settings_all_words],
+    )]
+    menu_settings_all_words: nwg::MenuItem,
 
     #[nwg_layout(
         parent: window,
@@ -339,6 +348,8 @@ impl App {
         let args = self.args.borrow();
         self.menu_settings_lowercase.set_checked(args.lowercase);
         self.menu_settings_hide_empty.set_checked(args.hide_empty);
+        self.menu_settings_all_words
+            .set_checked(args.show_all_words);
         self.menu_settings_emojis.set_checked(args.emojis);
     }
     fn menu_settings_lowercase(&self) {
@@ -353,6 +364,14 @@ impl App {
         {
             let mut args = self.args.borrow_mut();
             args.hide_empty = !args.hide_empty;
+        }
+        let sources = self.last_source.borrow().clone();
+        self.start_analyze(sources);
+    }
+    fn menu_settings_all_words(&self) {
+        {
+            let mut args = self.args.borrow_mut();
+            args.show_all_words = !args.show_all_words;
         }
         let sources = self.last_source.borrow().clone();
         self.start_analyze(sources);
@@ -482,6 +501,7 @@ fn main() {
         hide_empty: true,
         outfile: None,
         emojis: false,
+        show_all_words: true,
     };
     (*app.pwd.borrow_mut()) =
         canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))
