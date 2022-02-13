@@ -74,9 +74,11 @@ pub fn analysis_to_string(
     hide_empty: bool,
     search_regex: &Option<Regex>,
     emojis: bool,
-) -> String {
+) -> (String, usize, usize) {
     let mut buffer = String::new();
+    let filtered_word_count;
     let (analysis_string, analysis_string_bottom) = if search_regex.is_none() {
+        filtered_word_count = analysis.word_freq.len();
         analysis_words_to_string(analysis, top_words, bottom_words, emojis)
     } else {
         let regex = search_regex.as_ref().unwrap();
@@ -86,10 +88,11 @@ pub fn analysis_to_string(
             .into_iter()
             .filter(|(_, string)| regex.is_match(string))
             .collect();
+        filtered_word_count = tmp_analysis.word_freq.len();
         analysis_words_to_string(&tmp_analysis, top_words, bottom_words, emojis)
     };
     if analysis_string.is_empty() && hide_empty {
-        return buffer;
+        return (buffer, 0, 0);
     }
     buffer.push_str(&format!("🔢 Word count: {}\n", analysis.word_count));
     buffer.push_str(&format!("🔢 Sentence count: {}\n", analysis.sent_count));
@@ -112,11 +115,17 @@ pub fn analysis_to_string(
         "📊 Word frequency mode: {:.1}\n",
         analysis.word_dist_mode
     ));
+    if search_regex.is_some() {
+        buffer.push_str(&format!(
+            "🔎 Words matching filter: {}\n",
+            filtered_word_count
+        ));
+    }
     if analysis_string.is_empty() {
         buffer.push_str(if search_regex.is_none() {
-            "⚠️ No words in file"
+            "⚠️ No words in file\n"
         } else {
-            "⚠️ No results in file"
+            "⚠️ No results in file\n"
         })
     } else {
         buffer.push_str("📈 Top words");
@@ -134,7 +143,11 @@ pub fn analysis_to_string(
             buffer.push_str(&analysis_string_bottom);
         }
     };
-    buffer
+    (
+        buffer,
+        analysis_string.lines().count() + analysis_string_bottom.lines().count(),
+        filtered_word_count,
+    )
 }
 
 pub fn get_result_text(
@@ -175,7 +188,7 @@ pub fn get_result_text(
     let mut results_texts = analyses
         .into_par_iter()
         .filter_map(|analysis| {
-            let analysis_string = analysis_to_string(
+            let (analysis_string, _, _) = analysis_to_string(
                 analysis,
                 args.top_words,
                 args.bottom_words,
@@ -211,8 +224,9 @@ pub fn get_result_text(
     }
 
     if let Some(ref analysis) = total {
+        let (mut printed_total, mut filtered_word_count) = (0, 0);
         if results_count > 1 {
-            let analysis_string = analysis_to_string(
+            let (analysis_string, _printed_total, _filtered_word_count) = analysis_to_string(
                 analysis,
                 args.top_words,
                 args.bottom_words,
@@ -220,6 +234,8 @@ pub fn get_result_text(
                 &regex,
                 args.emojis,
             );
+            printed_total = _printed_total;
+            filtered_word_count = _filtered_word_count;
             if !analysis_string.is_empty() {
                 buffer.push_str(&format!("📢 Summary of {} files\n", analyses_count));
                 buffer.push_str(&analysis_string);
@@ -228,8 +244,8 @@ pub fn get_result_text(
             buffer.push('\n');
         }
 
-        if args.show_all_words {
-            let analysis_string =
+        if args.show_all_words && printed_total < filtered_word_count {
+            let (analysis_string, _, _) =
                 analysis_to_string(analysis, 0, 0, args.hide_empty, &regex, args.emojis);
             if !analysis_string.is_empty() {
                 buffer.push_str(&format!(
@@ -249,5 +265,5 @@ pub fn get_result_text(
         })
     }
 
-    Ok(buffer.replace("\r\n", "\n").replace('\n', "\r\n"))
+    Ok(buffer.trim().replace("\r\n", "\n").replace('\n', "\r\n") + "\n")
 }

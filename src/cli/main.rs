@@ -17,6 +17,7 @@ use clap::{ErrorKind, IntoApp, Parser};
 use console::{style, Emoji};
 use indicatif::{ProgressBar, ProgressStyle};
 use pathdiff::diff_paths;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::{Regex, RegexBuilder};
 
 use crate::shared::{analyze, Analysis, AnalyzeSource, Args};
@@ -61,10 +62,10 @@ fn print_analysis(
     bottom_words: usize,
     emojis: bool,
     regex: &Option<Regex>,
-) {
+) -> (usize, usize) {
     if analysis.word_freq.is_empty() {
         eprintln!("{}{}", Emoji("⚠️ ", ""), style("No words in file").red());
-        return;
+        return (0, 0);
     }
     println!(
         "{}Word count: {}",
@@ -111,12 +112,36 @@ fn print_analysis(
         Emoji("📊 ", ""),
         style(&format!("{:.1}", analysis.word_dist_mode)).blue()
     );
+
+    let filtered_word_count = if let Some(regex) = regex {
+        analysis
+            .word_freq
+            .par_iter()
+            .filter(|(_, word)| regex.is_match(word))
+            .count()
+    } else {
+        analysis.word_freq.len()
+    };
+    if filtered_word_count == 0 {
+        eprintln!(
+            "{}{}",
+            Emoji("⚠️ ", ""),
+            style("No words in file matching filter").red()
+        );
+        return (0, 0);
+    } else {
+        println!(
+            "{}Words matching filter: {}",
+            Emoji("🔎 ", ""),
+            style(&format!("{}", filtered_word_count)).blue()
+        );
+    }
+
     println!(
         "{}Top words{}",
         Emoji("📈 ", ""),
         if regex.is_some() { " (filtered):" } else { ":" }
     );
-
     let regex = regex.as_ref();
     let pad = format!("{}", analysis.word_freq[0].0).len();
     let mut printed_top = 0;
@@ -142,7 +167,8 @@ fn print_analysis(
         }
     }
 
-    if bottom_words > 0 && top_words != 0 && printed_top < analysis.word_count {
+    let mut printed_bottom = 0;
+    if bottom_words > 0 && top_words != 0 && printed_top < filtered_word_count {
         let pad = format!(
             "{}",
             analysis
@@ -158,7 +184,7 @@ fn print_analysis(
             Emoji("📉 ", ""),
             if regex.is_some() { " (filtered):" } else { ":" }
         );
-        let mut printed_bottom = 0;
+
         for (freq, string) in analysis.word_freq.iter().rev() {
             if bottom_words > 0 && printed_bottom >= bottom_words {
                 break;
@@ -181,6 +207,8 @@ fn print_analysis(
             }
         }
     }
+
+    (printed_top + printed_bottom, filtered_word_count)
 }
 
 fn print_analysis_file(analysis: &Analysis, path: &Path) {
@@ -360,7 +388,7 @@ fn main() {
     }
 
     if let Some(analysis) = total {
-        if analyses_count > 1 {
+        let (printed_total, filtered_word_count) = if analyses_count > 1 {
             println!();
             println!(
                 "{}{} {} {}",
@@ -375,10 +403,11 @@ fn main() {
                 args.bottom_words,
                 args.emojis,
                 &regex,
-            );
-        }
-
-        if args.show_all_words {
+            )
+        } else {
+            (0, 0)
+        };
+        if args.show_all_words && printed_total < filtered_word_count {
             println!();
             println!(
                 "{}{} {} {}",
