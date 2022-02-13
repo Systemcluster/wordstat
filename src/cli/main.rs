@@ -17,6 +17,7 @@ use clap::{ErrorKind, IntoApp, Parser};
 use console::{style, Emoji};
 use indicatif::{ProgressBar, ProgressStyle};
 use pathdiff::diff_paths;
+use regex::{Regex, RegexBuilder};
 
 use crate::shared::{analyze, Analysis, AnalyzeSource, Args};
 
@@ -40,6 +41,9 @@ pub struct CliArgs {
     /// Print combined analysis with all words found in files
     #[clap(short, long)]
     show_all_words: bool,
+    /// Filter printed words by string or regex
+    #[clap(short, long)]
+    word_filter: Option<String>,
     /// Iterate through subdirectories
     #[clap(short, long)]
     recursive: bool,
@@ -51,7 +55,13 @@ pub struct CliArgs {
     outfile: Option<String>,
 }
 
-fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize, emojis: bool) {
+fn print_analysis(
+    analysis: &Analysis,
+    top_words: usize,
+    bottom_words: usize,
+    emojis: bool,
+    regex: &Option<Regex>,
+) {
     if analysis.word_freq.is_empty() {
         eprintln!("{}{}", Emoji("⚠️ ", ""), style("No words in file").red());
         return;
@@ -101,42 +111,21 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize, em
         Emoji("📊 ", ""),
         style(&format!("{:.1}", analysis.word_dist_mode)).blue()
     );
-    println!("{}Top words:", Emoji("📈 ", ""));
+    println!(
+        "{}Top words{}",
+        Emoji("📈 ", ""),
+        if regex.is_some() { " (filtered):" } else { ":" }
+    );
+
+    let regex = regex.as_ref();
     let pad = format!("{}", analysis.word_freq[0].0).len();
-    for (i, (freq, string)) in analysis.word_freq.iter().enumerate() {
-        if top_words > 0 && i >= top_words {
+    let mut printed_top = 0;
+    for (freq, string) in analysis.word_freq.iter() {
+        if top_words > 0 && printed_top >= top_words {
             break;
         };
-        print!(
-            "  {}: {}",
-            style(&format!("{:width$}", freq, width = pad))
-                .bold()
-                .blue(),
-            style(string).green(),
-        );
-        if emojis {
-            if let Some(e) = emojis::lookup(&string.to_lowercase()) {
-                print!(" {}", e);
-            }
-        }
-        println!();
-    }
-    if bottom_words > 0 && top_words != 0 && top_words < analysis.word_count {
-        let pad = format!(
-            "{}",
-            analysis
-                .word_freq
-                .iter()
-                .nth_back(0)
-                .map(|n| n.0)
-                .unwrap_or(0)
-        )
-        .len();
-        println!("{}Bottom words:", Emoji("📉 ", ""));
-        for (i, (freq, string)) in analysis.word_freq.iter().rev().enumerate() {
-            if bottom_words > 0 && i >= bottom_words {
-                break;
-            };
+        if regex.is_none() || regex.unwrap().is_match(string) {
+            printed_top += 1;
             print!(
                 "  {}: {}",
                 style(&format!("{:width$}", freq, width = pad))
@@ -150,6 +139,46 @@ fn print_analysis(analysis: &Analysis, top_words: usize, bottom_words: usize, em
                 }
             }
             println!();
+        }
+    }
+
+    if bottom_words > 0 && top_words != 0 && printed_top < analysis.word_count {
+        let pad = format!(
+            "{}",
+            analysis
+                .word_freq
+                .iter()
+                .nth_back(0)
+                .map(|n| n.0)
+                .unwrap_or(0)
+        )
+        .len();
+        println!(
+            "{}Bottom words{}",
+            Emoji("📉 ", ""),
+            if regex.is_some() { " (filtered):" } else { ":" }
+        );
+        let mut printed_bottom = 0;
+        for (freq, string) in analysis.word_freq.iter().rev() {
+            if bottom_words > 0 && printed_bottom >= bottom_words {
+                break;
+            };
+            if regex.is_none() || regex.unwrap().is_match(string) {
+                printed_bottom += 1;
+                print!(
+                    "  {}: {}",
+                    style(&format!("{:width$}", freq, width = pad))
+                        .bold()
+                        .blue(),
+                    style(string).green(),
+                );
+                if emojis {
+                    if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                        print!(" {}", e);
+                    }
+                }
+                println!();
+            }
         }
     }
 }
@@ -211,6 +240,53 @@ fn main() {
             .error(ErrorKind::InvalidValue, "No files or directories specified")
             .exit()
     }
+
+    let word_filter = args.word_filter.as_ref();
+    let regex = match word_filter {
+        None => None,
+        Some(search_text) if search_text.is_empty() => None,
+        Some(search_text) => {
+            let search_is_regex = search_text.len() >= 3
+                && search_text.starts_with('/')
+                && (search_text.ends_with('/') || search_text.ends_with("/i"));
+            let is_insensitive = search_text.ends_with("/i");
+            if search_is_regex {
+                Some(
+                    RegexBuilder::new(
+                        &search_text[1..search_text.len() - if is_insensitive { 2 } else { 1 }],
+                    )
+                    .case_insensitive(search_text.ends_with("/i"))
+                    .multi_line(false)
+                    .build()
+                    .unwrap_or_else(|error| {
+                        app.lock()
+                            .unwrap()
+                            .error(
+                                ErrorKind::Io,
+                                format!("Could not create filter regex: {}", error),
+                            )
+                            .exit()
+                    }),
+                )
+            } else {
+                Some(
+                    RegexBuilder::new(&regex::escape(search_text))
+                        .case_insensitive(true)
+                        .multi_line(false)
+                        .build()
+                        .unwrap_or_else(|error| {
+                            app.lock()
+                                .unwrap()
+                                .error(
+                                    ErrorKind::Io,
+                                    format!("Could not create filter regex: {}", error),
+                                )
+                                .exit()
+                        }),
+                )
+            }
+        }
+    };
 
     println!(
         "{}checking {} {}",
@@ -274,7 +350,13 @@ fn main() {
             )
             .blue()
         );
-        print_analysis(analysis, args.top_words, args.bottom_words, args.emojis);
+        print_analysis(
+            analysis,
+            args.top_words,
+            args.bottom_words,
+            args.emojis,
+            &regex,
+        );
     }
 
     if let Some(analysis) = total {
@@ -287,7 +369,13 @@ fn main() {
                 style(&format!("{}", analyses_count)).bold().magenta(),
                 style("files").yellow()
             );
-            print_analysis(&analysis, args.top_words, args.bottom_words, args.emojis);
+            print_analysis(
+                &analysis,
+                args.top_words,
+                args.bottom_words,
+                args.emojis,
+                &regex,
+            );
         }
 
         if args.show_all_words {
@@ -299,7 +387,7 @@ fn main() {
                 style(&format!("{}", analyses_count)).bold().magenta(),
                 style("files (all words)").yellow()
             );
-            print_analysis(&analysis, 0, 0, args.emojis);
+            print_analysis(&analysis, 0, 0, args.emojis, &regex);
         }
 
         if let Some(path) = args.outfile {

@@ -35,6 +35,7 @@ OPTIONS:
     -s, --show-all-words                 Print combined analysis with all words found in files
     -t, --top-words <TOP_WORDS>          Number of top words to show per file (0 = all) [default: 10]
     -V, --version                        Print version information
+    -w, --word-filter <FILTER>           Filter printed words by string or regex
 ```
 
 ### GUI
