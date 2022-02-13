@@ -95,6 +95,7 @@ cli = ["wild", "clap", "indicatif", "console"]
 gui = ["native-windows-gui", "native-windows-derive", "flume", "winapi"]
 
 [build-dependencies]
+which = {version = "4"}
 winres = {version = "0.1"}
 
 [dev-dependencies]

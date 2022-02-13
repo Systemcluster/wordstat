@@ -495,6 +495,8 @@ fn main() {
     let _ = nwg::Font::set_global_default(Some(font));
 
     let app = App::build_ui(Default::default()).expect("Failed to build UI");
+    app.window
+        .set_text(&(app.window.text() + " " + env!("CARGO_PKG_VERSION")));
     let (tx, tr) = flume::unbounded();
     (*app.tx.borrow_mut()) = Some(tx);
     (*app.tr.borrow_mut()) = Some(tr);
