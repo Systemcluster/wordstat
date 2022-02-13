@@ -274,7 +274,10 @@ impl App {
                 self.window.set_focus();
                 self.progress.set_focus();
             }
-            if *key == nwg::keys::_V && self.control_pressed.load(Ordering::Relaxed) {
+            if !self.search.focus()
+                && *key == nwg::keys::_V
+                && self.control_pressed.load(Ordering::Relaxed)
+            {
                 if let Some(text) = nwg::Clipboard::data_text(&self.window) {
                     self.start_analyze(Vec::from([AnalyzeSource::Content(text)]));
                 }
