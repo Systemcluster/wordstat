@@ -38,9 +38,15 @@ OPTIONS:
     -w, --word-filter <FILTER>           Filter printed words by string or regex
 ```
 
+`word-filter` accepts simple search terms and regular expressions. It is evaluated as regex if it starts with `/` and ends with `/` or `/i`, ending in `/i` will make the regex case-insensitive.
+
 ### GUI
 
 ![GUI](./resources/gui.png)
+
+#### Details
+
+The search bar accepts simple search terms and regular expressions. It is evaluated as regex if it starts with `/` and ends with `/` or `/i`, ending in `/i` will make the regex case-insensitive.
 
 ## Download
 
