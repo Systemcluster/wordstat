@@ -3,13 +3,8 @@
 use glassbench::*;
 use std::path::PathBuf;
 
-#[path = "../src/uhash.rs"]
-mod uhash;
-#[path = "../src/ustring.rs"]
-mod ustring;
-#[path = "../src/shared.rs"]
+#[path = "../src/shared/mod.rs"]
 mod wordstat;
-
 use wordstat::*;
 
 fn bench_examples(bencher: &mut Bench) {

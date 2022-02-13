@@ -3,9 +3,8 @@
 #![feature(slice_take)]
 #![feature(const_mut_refs)]
 
+#[path = "../shared/mod.rs"]
 mod shared;
-mod uhash;
-mod ustring;
 
 use std::{
     fs::{canonicalize, File},

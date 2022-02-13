@@ -1,3 +1,6 @@
+mod uhash;
+mod ustring;
+
 use std::{
     collections::HashMap,
     hash::BuildHasherDefault,
@@ -15,8 +18,8 @@ use rayon::iter::{
 use unicode_segmentation::UnicodeSegmentation;
 use walkdir::WalkDir;
 
-use crate::uhash::IdentityHasher;
-use crate::ustring::UniqueString;
+use uhash::IdentityHasher;
+use ustring::UniqueString;
 
 #[derive(Default, Debug, Clone)]
 pub struct Analysis {

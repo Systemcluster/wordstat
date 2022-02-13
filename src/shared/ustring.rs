@@ -11,7 +11,7 @@ use std::ptr::NonNull;
 use bumpalo::Bump;
 use parking_lot::Mutex;
 
-pub use crate::uhash::{ahash, IdentityHashMap};
+pub use super::uhash::{ahash, IdentityHashMap};
 
 const BUCKET_COUNT: u64 = 64;
 const BUCKET_BASE_CAPACITY: usize = 0;

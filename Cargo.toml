@@ -10,12 +10,12 @@ version = "0.1.0"
 
 [[bin]]
 name = "wordstat"
-path = "src/main_cli.rs"
+path = "src/cli/main.rs"
 required-features = ["cli"]
 
 [[bin]]
 name = "wordstat-gui"
-path = "src/main_gui.rs"
+path = "src/gui/main.rs"
 required-features = ["gui"]
 
 [[bench]]
