@@ -26,7 +26,7 @@ pub fn analysis_words_to_string(
         buffer.push_str(": ");
         buffer.push_str(string);
         if emojis {
-            if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+            if let Some(e) = emojis::get_by_shortcode(&string.to_lowercase()) {
                 buffer.push_str(format!(" {}", e).trim());
             }
         }
@@ -57,7 +57,7 @@ pub fn analysis_words_to_string(
             buffer_bottom.push_str(string);
 
             if emojis {
-                if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                if let Some(e) = emojis::get_by_shortcode(&string.to_lowercase()) {
                     buffer_bottom.push_str(format!(" {}", e).trim());
                 }
             }

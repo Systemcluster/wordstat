@@ -4,9 +4,9 @@ use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::lazy::SyncLazy;
 use std::ops::Deref;
 use std::ptr::NonNull;
+use std::sync::LazyLock;
 
 use bumpalo::Bump;
 use parking_lot::Mutex;
@@ -81,7 +81,7 @@ impl UniqueStringStore {
     }
 }
 
-static INTERNED_STRINGS: SyncLazy<UniqueStringStore> = SyncLazy::new(UniqueStringStore::new);
+static INTERNED_STRINGS: LazyLock<UniqueStringStore> = LazyLock::new(UniqueStringStore::new);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct UniqueString {

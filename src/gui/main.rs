@@ -3,7 +3,6 @@
 #![feature(once_cell)]
 #![feature(slice_take)]
 #![feature(const_mut_refs)]
-#![feature(thread_is_running)]
 #![feature(try_blocks)]
 
 use native_windows_derive as nwd;

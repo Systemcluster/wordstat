@@ -11,6 +11,7 @@ use std::{
     io::{BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use clap::{ErrorKind, IntoApp, Parser};
@@ -159,7 +160,7 @@ fn print_analysis(
                 style(string).green(),
             );
             if emojis {
-                if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                if let Some(e) = emojis::get_by_shortcode(&string.to_lowercase()) {
                     print!(" {}", e);
                 }
             }
@@ -199,7 +200,7 @@ fn print_analysis(
                     style(string).green(),
                 );
                 if emojis {
-                    if let Some(e) = emojis::lookup(&string.to_lowercase()) {
+                    if let Some(e) = emojis::get_by_shortcode(&string.to_lowercase()) {
                         print!(" {}", e);
                     }
                 }
@@ -326,11 +327,12 @@ fn main() {
     let bar_progress =
         ProgressBar::new(0).with_style(
             ProgressStyle::default_bar()
-                .template("{spinner:.green} {elapsed_precise} [{wide_bar:.green}] {pos}/{len}\n{spinner:.green} {wide_msg}"),
+                .template("{spinner:.green} {elapsed_precise} [{wide_bar:.green}] {pos}/{len}\n{spinner:.green} {wide_msg}")
+                .unwrap(),
         );
     bar_progress.set_length(paths.len() as u64);
     bar_progress.set_position(0);
-    bar_progress.enable_steady_tick(12);
+    bar_progress.enable_steady_tick(Duration::from_millis(12));
 
     let args = Args {
         lowercase: args.lowercase,
