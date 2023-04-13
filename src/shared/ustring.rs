@@ -6,7 +6,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::ptr::NonNull;
-use std::sync::LazyLock;
+use std::sync::OnceLock;
 
 use bumpalo::Bump;
 use parking_lot::Mutex;
@@ -81,7 +81,7 @@ impl UniqueStringStore {
     }
 }
 
-static INTERNED_STRINGS: LazyLock<UniqueStringStore> = LazyLock::new(UniqueStringStore::new);
+static INTERNED_STRINGS: OnceLock<UniqueStringStore> = OnceLock::new();
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct UniqueString {
@@ -168,7 +168,9 @@ impl UniqueStringIntermediary<'_> {
     #[inline]
     pub fn intern(self) -> UniqueString {
         UniqueString {
-            entry: INTERNED_STRINGS.get_or_store(self.string, self.hash),
+            entry: INTERNED_STRINGS
+                .get_or_init(UniqueStringStore::new)
+                .get_or_store(self.string, self.hash),
         }
     }
 }
