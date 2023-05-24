@@ -216,7 +216,7 @@ pub fn analyze<
                     .for_each(|file| {
                         on_progress(format!(
                             "Analyzing {}",
-                            diff_paths(file.path(), &pwd)
+                            diff_paths(file.path(), pwd)
                                 .unwrap_or_else(|| file.path().to_owned())
                                 .display()
                         ));
@@ -238,7 +238,7 @@ pub fn analyze<
         if let Err((path, error)) = analysis {
             on_error(format!(
                 "Failed to analyze {}: {}",
-                diff_paths(&path, &pwd)
+                diff_paths(path, pwd)
                     .unwrap_or_else(|| path.to_owned())
                     .display(),
                 error

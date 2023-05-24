@@ -83,11 +83,9 @@ pub fn analysis_to_string(
     } else {
         let regex = search_regex.as_ref().unwrap();
         let mut tmp_analysis = analysis.clone();
-        tmp_analysis.word_freq = tmp_analysis
+        tmp_analysis
             .word_freq
-            .into_iter()
-            .filter(|(_, string)| regex.is_match(string))
-            .collect();
+            .retain(|(_, string)| regex.is_match(string));
         filtered_word_count = tmp_analysis.word_freq.len();
         analysis_words_to_string(&tmp_analysis, top_words, bottom_words, emojis)
     };

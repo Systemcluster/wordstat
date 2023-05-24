@@ -1,8 +1,3 @@
-#![feature(async_closure)]
-#![feature(once_cell)]
-#![feature(slice_take)]
-#![feature(const_mut_refs)]
-
 #[path = "../shared/mod.rs"]
 mod shared;
 

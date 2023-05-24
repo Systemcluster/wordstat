@@ -55,11 +55,11 @@ A build of the latest version can be found on the [release page](https://github.
 Alternatively it can be installed with `cargo`:
 
 ```shell
-cargo +nightly install --git https://github.com/Systemcluster/wordstat.git --bin wordstat
+cargo install --git https://github.com/Systemcluster/wordstat.git --bin wordstat
 ```
 
 The GUI version can be installed with `cargo` as well, note that the GUI is Windows-only for now:
 
 ```shell
-cargo +nightly install --git https://github.com/Systemcluster/wordstat.git --no-default-features --features gui --bin wordstat-gui
+cargo install --git https://github.com/Systemcluster/wordstat.git --no-default-features --features gui --bin wordstat-gui
 ```

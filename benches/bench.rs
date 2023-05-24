@@ -1,5 +1,3 @@
-#![feature(once_cell)]
-
 use glassbench::*;
 use std::path::PathBuf;
 

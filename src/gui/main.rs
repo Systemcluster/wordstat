@@ -1,9 +1,4 @@
 #![windows_subsystem = "windows"]
-#![feature(async_closure)]
-#![feature(once_cell)]
-#![feature(slice_take)]
-#![feature(const_mut_refs)]
-#![feature(try_blocks)]
 
 use native_windows_derive as nwd;
 use native_windows_gui as nwg;

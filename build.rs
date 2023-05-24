@@ -4,7 +4,7 @@ use which::which;
 fn get_git_hash() -> Option<String> {
     which("git").ok().and_then(|git| {
         Command::new(git)
-            .args(&["rev-parse", "--short", "HEAD"])
+            .args(["rev-parse", "--short", "HEAD"])
             .output()
             .ok()
             .and_then(|output| {
