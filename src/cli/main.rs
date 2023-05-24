@@ -62,47 +62,47 @@ fn print_analysis(
     println!(
         "{}Word count: {}",
         Emoji("🔢 ", ""),
-        style(&format!("{}", analysis.word_count)).blue()
+        style(&format!("{}", analysis.word_count)).blue().bright()
     );
     println!(
         "{}Sentence count: {}",
         Emoji("🔢 ", ""),
-        style(&format!("{}", analysis.sent_count)).blue()
+        style(&format!("{}", analysis.sent_count)).blue().bright()
     );
     println!(
         "{}Character count: {}",
         Emoji("🔢 ", ""),
-        style(&format!("{}", analysis.char_count)).blue()
+        style(&format!("{}", analysis.char_count)).blue().bright()
     );
     println!(
         "{}Paragraph count: {}",
         Emoji("🔢 ", ""),
-        style(&format!("{}", analysis.para_count)).blue()
+        style(&format!("{}", analysis.para_count)).blue().bright()
     );
     println!(
         "{}Unique words: {}",
         Emoji("🔢 ", ""),
-        style(&format!("{}", analysis.word_uniqs)).blue()
+        style(&format!("{}", analysis.word_uniqs)).blue().bright()
     );
     println!(
         "{}Word frequency mean: {}",
         Emoji("📊 ", ""),
-        style(&format!("{:.2}", analysis.word_dist_mean)).blue()
+        style(&format!("{:.2}", analysis.word_dist_mean)).blue().bright()
     );
     println!(
         "{}Word frequency standard deviation: {}",
         Emoji("📊 ", ""),
-        style(&format!("{:.2}", analysis.word_dist_stddev)).blue()
+        style(&format!("{:.2}", analysis.word_dist_stddev)).blue().bright()
     );
     println!(
         "{}Word frequency median: {}",
         Emoji("📊 ", ""),
-        style(&format!("{:.1}", analysis.word_dist_median)).blue()
+        style(&format!("{:.1}", analysis.word_dist_median)).blue().bright()
     );
     println!(
         "{}Word frequency mode: {}",
         Emoji("📊 ", ""),
-        style(&format!("{:.1}", analysis.word_dist_mode)).blue()
+        style(&format!("{:.1}", analysis.word_dist_mode)).blue().bright()
     );
 
     let filtered_word_count = if let Some(regex) = regex {
@@ -117,7 +117,7 @@ fn print_analysis(
         println!(
             "{}Words matching filter: {}",
             Emoji("🔎 ", ""),
-            style(&format!("{}", filtered_word_count)).blue()
+            style(&format!("{}", filtered_word_count)).blue().bright()
         );
     }
 
