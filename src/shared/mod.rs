@@ -23,44 +23,40 @@ use ustring::UniqueString;
 
 #[derive(Default, Debug, Clone)]
 pub struct Analysis {
-    pub file: Option<PathBuf>,
-    pub word_count: usize,
-    pub char_count: usize,
-    pub sent_count: usize,
-    pub para_count: usize,
-    pub word_uniqs: usize,
-    pub word_freq: Vec<(usize, UniqueString)>,
-    pub word_freq_map: DashMap<UniqueString, usize, BuildHasherDefault<IdentityHasher>>,
-    pub word_dist_mean: f64,
+    pub file:             Option<PathBuf>,
+    pub word_count:       usize,
+    pub char_count:       usize,
+    pub sent_count:       usize,
+    pub para_count:       usize,
+    pub word_uniqs:       usize,
+    pub word_freq:        Vec<(usize, UniqueString)>,
+    pub word_freq_map:    DashMap<UniqueString, usize, BuildHasherDefault<IdentityHasher>>,
+    pub word_dist_mean:   f64,
     pub word_dist_stddev: f64,
     pub word_dist_median: f64,
-    pub word_dist_mode: f64,
+    pub word_dist_mode:   f64,
 }
 
 #[derive(Default, Debug, Clone)]
 pub struct Args {
-    pub lowercase: bool,
-    pub top_words: usize,
-    pub bottom_words: usize,
-    pub recursive: bool,
+    pub lowercase:       bool,
+    pub top_words:       usize,
+    pub bottom_words:    usize,
+    pub recursive:       bool,
     pub follow_symlinks: bool,
-    pub outfile: Option<String>,
-    pub hide_empty: bool,
-    pub emojis: bool,
-    pub show_all_words: bool,
+    pub outfile:         Option<String>,
+    pub hide_empty:      bool,
+    pub emojis:          bool,
+    pub show_all_words:  bool,
 }
 
 fn update_dists(analysis: &mut Analysis) {
     if analysis.word_freq.is_empty() {
         return;
     }
-    analysis.word_dist_mean = analysis
-        .word_freq
-        .iter()
-        .map(|a| a.0)
-        .reduce(|a, b| a + b)
-        .unwrap_or_default() as f64
-        / analysis.word_uniqs as f64;
+    analysis.word_dist_mean =
+        analysis.word_freq.iter().map(|a| a.0).reduce(|a, b| a + b).unwrap_or_default() as f64
+            / analysis.word_uniqs as f64;
     analysis.word_dist_stddev = (analysis
         .word_freq
         .iter()
@@ -83,28 +79,20 @@ fn update_dists(analysis: &mut Analysis) {
         .word_freq
         .iter()
         .for_each(|(freq, _)| *mode_counts.entry(*freq).or_insert(0) += 1);
-    let max_count = mode_counts
-        .iter()
-        .max_by_key(|(_, &v)| v)
-        .map(|(_, &v)| v)
-        .unwrap_or(0);
+    let max_count = mode_counts.iter().max_by_key(|(_, &v)| v).map(|(_, &v)| v).unwrap_or(0);
     if max_count > 0 {
         let mut counts = 0;
         analysis.word_dist_mode =
-            mode_counts
-                .iter()
-                .filter(|(_, &v)| v == max_count)
-                .fold(0, |acc, (&k, _)| {
-                    counts += 1;
-                    acc + k
-                }) as f64
+            mode_counts.iter().filter(|(_, &v)| v == max_count).fold(0, |acc, (&k, _)| {
+                counts += 1;
+                acc + k
+            }) as f64
                 / counts as f64;
     }
 }
 
 async fn process(
-    source: AnalyzeSource,
-    lowercase: bool,
+    source: AnalyzeSource, lowercase: bool,
 ) -> Result<Analysis, (PathBuf, std::io::Error)> {
     let (content, file) = match source {
         AnalyzeSource::Content(content) => (content, None),
@@ -166,13 +154,8 @@ pub fn analyze<
     M: Fn(String) + Sync + Send,
     I: Fn(u64) + Sync + Send,
 >(
-    sources: &Vec<AnalyzeSource>,
-    args: &Args,
-    pwd: &Path,
-    on_error: E,
-    on_message: M,
-    on_progress: P,
-    on_increment: I,
+    sources: &Vec<AnalyzeSource>, args: &Args, pwd: &Path, on_error: E, on_message: M,
+    on_progress: P, on_increment: I,
 ) -> (Vec<Analysis>, Option<Analysis>) {
     let pool = ThreadPool::new(ThreadPoolDescriptor {
         num_threads: num_cpus::get(),
@@ -188,10 +171,9 @@ pub fn analyze<
         match source {
             AnalyzeSource::Content(content) => {
                 on_progress("Analyzing...".to_string());
-                tasks.lock().unwrap().push(pool.spawn(process(
-                    AnalyzeSource::Content(content.to_owned()),
-                    args.lowercase,
-                )));
+                tasks.lock().unwrap().push(
+                    pool.spawn(process(AnalyzeSource::Content(content.to_owned()), args.lowercase)),
+                );
             }
             AnalyzeSource::Path(path) => {
                 let walk = WalkDir::new(path)
@@ -238,9 +220,7 @@ pub fn analyze<
         if let Err((path, error)) = analysis {
             on_error(format!(
                 "Failed to analyze {}: {}",
-                diff_paths(path, pwd)
-                    .unwrap_or_else(|| path.to_owned())
-                    .display(),
+                diff_paths(path, pwd).unwrap_or_else(|| path.to_owned()).display(),
                 error
             ));
             continue;
@@ -267,10 +247,7 @@ pub fn analyze<
             total = Some(analysis);
         }
     }
-    let analyses = analyses
-        .into_iter()
-        .filter_map(|analysis| analysis.ok())
-        .collect();
+    let analyses = analyses.into_iter().filter_map(|analysis| analysis.ok()).collect();
     if let Some(analysis) = &mut total {
         analysis.word_freq_map.iter().for_each(|item| {
             let (word, count) = (item.key(), item.value());

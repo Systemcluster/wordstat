@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
-use std::collections::{HashMap, HashSet};
-use std::hash::{BuildHasherDefault, Hasher};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{BuildHasherDefault, Hasher},
+};
 
 use byteorder::{ByteOrder, NativeEndian};
 

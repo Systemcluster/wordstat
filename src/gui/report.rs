@@ -8,10 +8,7 @@ use regex::{Regex, RegexBuilder};
 use super::shared::{Analysis, Args};
 
 pub fn analysis_words_to_string(
-    analysis: &Analysis,
-    top_words: usize,
-    bottom_words: usize,
-    emojis: bool,
+    analysis: &Analysis, top_words: usize, bottom_words: usize, emojis: bool,
 ) -> (String, String) {
     if analysis.word_freq.is_empty() {
         return ("".to_owned(), "".to_owned());
@@ -38,16 +35,8 @@ pub fn analysis_words_to_string(
         && top_words < analysis.word_count
         && top_words < analysis.word_freq.len()
     {
-        let pad = format!(
-            "{}",
-            analysis
-                .word_freq
-                .iter()
-                .nth_back(0)
-                .map(|n| n.0)
-                .unwrap_or(0)
-        )
-        .len();
+        let pad =
+            format!("{}", analysis.word_freq.iter().nth_back(0).map(|n| n.0).unwrap_or(0)).len();
         for (i, (freq, string)) in analysis.word_freq.iter().rev().enumerate() {
             if bottom_words > 0 && i >= bottom_words {
                 break;
@@ -68,12 +57,8 @@ pub fn analysis_words_to_string(
 }
 
 pub fn analysis_to_string(
-    analysis: &Analysis,
-    top_words: usize,
-    bottom_words: usize,
-    hide_empty: bool,
-    search_regex: &Option<Regex>,
-    emojis: bool,
+    analysis: &Analysis, top_words: usize, bottom_words: usize, hide_empty: bool,
+    search_regex: &Option<Regex>, emojis: bool,
 ) -> (String, usize, usize) {
     let mut buffer = String::new();
     let filtered_word_count;
@@ -83,9 +68,7 @@ pub fn analysis_to_string(
     } else {
         let regex = search_regex.as_ref().unwrap();
         let mut tmp_analysis = analysis.clone();
-        tmp_analysis
-            .word_freq
-            .retain(|(_, string)| regex.is_match(string));
+        tmp_analysis.word_freq.retain(|(_, string)| regex.is_match(string));
         filtered_word_count = tmp_analysis.word_freq.len();
         analysis_words_to_string(&tmp_analysis, top_words, bottom_words, emojis)
     };
@@ -97,27 +80,15 @@ pub fn analysis_to_string(
     buffer.push_str(&format!("🔢 Character count: {}\n", analysis.char_count));
     buffer.push_str(&format!("🔢 Paragraph count: {}\n", analysis.para_count));
     buffer.push_str(&format!("🔢 Unique words: {}\n", analysis.word_uniqs));
-    buffer.push_str(&format!(
-        "📊 Word frequency mean: {:.2}\n",
-        analysis.word_dist_mean
-    ));
+    buffer.push_str(&format!("📊 Word frequency mean: {:.2}\n", analysis.word_dist_mean));
     buffer.push_str(&format!(
         "📊 Word frequency standard deviation: {:.2}\n",
         analysis.word_dist_stddev
     ));
-    buffer.push_str(&format!(
-        "📊 Word frequency median: {:.1}\n",
-        analysis.word_dist_median
-    ));
-    buffer.push_str(&format!(
-        "📊 Word frequency mode: {:.1}\n",
-        analysis.word_dist_mode
-    ));
+    buffer.push_str(&format!("📊 Word frequency median: {:.1}\n", analysis.word_dist_median));
+    buffer.push_str(&format!("📊 Word frequency mode: {:.1}\n", analysis.word_dist_mode));
     if search_regex.is_some() {
-        buffer.push_str(&format!(
-            "🔎 Words matching filter: {}\n",
-            filtered_word_count
-        ));
+        buffer.push_str(&format!("🔎 Words matching filter: {}\n", filtered_word_count));
     }
     if analysis_string.is_empty() {
         buffer.push_str(if search_regex.is_none() {
@@ -149,9 +120,7 @@ pub fn analysis_to_string(
 }
 
 pub fn get_result_text(
-    analyses: &(Vec<Analysis>, Option<Analysis>),
-    args: &RefCell<Args>,
-    pwd: &RefCell<PathBuf>,
+    analyses: &(Vec<Analysis>, Option<Analysis>), args: &RefCell<Args>, pwd: &RefCell<PathBuf>,
     search_text: &str,
 ) -> Result<String> {
     let (analyses, total) = (&analyses.0, &analyses.1);
@@ -246,10 +215,7 @@ pub fn get_result_text(
             let (analysis_string, _, _) =
                 analysis_to_string(analysis, 0, 0, args.hide_empty, &regex, args.emojis);
             if !analysis_string.is_empty() {
-                buffer.push_str(&format!(
-                    "📢 Summary of {} files (all words)\n",
-                    analyses_count
-                ));
+                buffer.push_str(&format!("📢 Summary of {} files (all words)\n", analyses_count));
                 buffer.push_str(&analysis_string);
             }
         }

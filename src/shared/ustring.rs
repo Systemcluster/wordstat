@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 
-use std::borrow::Cow;
-use std::ffi::{CStr, CString};
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
-use std::ptr::NonNull;
-use std::sync::OnceLock;
+use std::{
+    borrow::Cow,
+    ffi::{CStr, CString},
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+    ops::Deref,
+    ptr::NonNull,
+    sync::OnceLock,
+};
 
 use bumpalo::Bump;
 use parking_lot::Mutex;
@@ -19,7 +21,7 @@ const BUCKET_BASE_CAPACITY: usize = 0;
 #[repr(C)]
 struct UniqueStringEntry {
     length: usize,
-    hash: u64,
+    hash:   u64,
     string: NonNull<u8>,
 }
 
@@ -44,9 +46,7 @@ impl UniqueStringBucket {
     }
 
     fn store(&mut self, string: &str, hash: u64) -> NonNull<u8> {
-        let str_addr = self
-            .alloc
-            .alloc_slice_copy(&[string.as_bytes(), &[0]].concat());
+        let str_addr = self.alloc.alloc_slice_copy(&[string.as_bytes(), &[0]].concat());
         let str_addr = unsafe { NonNull::new_unchecked(str_addr as *const _ as *mut _) };
         let ent_addr = self.alloc.alloc(UniqueStringEntry {
             length: string.len(),
@@ -92,7 +92,7 @@ unsafe impl Sync for UniqueString {}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct UniqueStringIntermediary<'a> {
-    hash: u64,
+    hash:   u64,
     string: &'a str,
 }
 
@@ -123,9 +123,7 @@ impl UniqueString {
     #[inline]
     pub fn as_str(&self) -> &'static str {
         unsafe {
-            let entry = (self.entry.as_ptr() as *const UniqueStringEntry)
-                .as_ref()
-                .unwrap();
+            let entry = (self.entry.as_ptr() as *const UniqueStringEntry).as_ref().unwrap();
             let slice = std::slice::from_raw_parts(entry.string.as_ptr(), entry.length);
             std::str::from_utf8_unchecked(slice)
         }
@@ -134,9 +132,7 @@ impl UniqueString {
     #[inline]
     pub fn as_cstr(&self) -> &'static CStr {
         unsafe {
-            let entry = (self.entry.as_ptr() as *const UniqueStringEntry)
-                .as_ref()
-                .unwrap();
+            let entry = (self.entry.as_ptr() as *const UniqueStringEntry).as_ref().unwrap();
             std::ffi::CStr::from_bytes_with_nul_unchecked(std::slice::from_raw_parts(
                 entry.string.as_ptr(),
                 entry.length + 1,
@@ -151,12 +147,7 @@ impl UniqueString {
 
     #[inline]
     pub fn hash(&self) -> u64 {
-        unsafe {
-            (self.entry.as_ptr() as *const UniqueStringEntry)
-                .as_ref()
-                .unwrap()
-                .hash
-        }
+        unsafe { (self.entry.as_ptr() as *const UniqueStringEntry).as_ref().unwrap().hash }
     }
 
     #[inline]

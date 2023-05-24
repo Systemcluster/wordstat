@@ -20,11 +20,13 @@ use std::{
 };
 
 use nwd::NwgUi;
-use nwg::stretch::{
-    geometry::{Rect, Size},
-    style::{AlignItems, AlignSelf, Dimension as D, FlexDirection, JustifyContent},
+use nwg::{
+    stretch::{
+        geometry::{Rect, Size},
+        style::{AlignItems, AlignSelf, Dimension as D, FlexDirection, JustifyContent},
+    },
+    NativeUi,
 };
-use nwg::NativeUi;
 
 use winapi::{
     shared::windef::HWND,
@@ -42,28 +44,28 @@ static ICON: &[u8] = include_bytes!("../../resources/book.ico");
 
 const PT_0: D = D::Points(0.0);
 const RECT_0: Rect<D> = Rect {
-    start: PT_0,
-    end: PT_0,
-    top: PT_0,
+    start:  PT_0,
+    end:    PT_0,
+    top:    PT_0,
     bottom: PT_0,
 };
 const PT_10: D = D::Points(10.0);
 const RECT_100: Rect<D> = Rect {
-    start: PT_0,
-    end: PT_0,
-    top: PT_10,
+    start:  PT_0,
+    end:    PT_0,
+    top:    PT_10,
     bottom: PT_0,
 };
 const RECT_101: Rect<D> = Rect {
-    start: PT_10,
-    end: PT_10,
-    top: PT_10,
+    start:  PT_10,
+    end:    PT_10,
+    top:    PT_10,
     bottom: PT_10,
 };
 const RECT_102: Rect<D> = Rect {
-    start: PT_0,
-    end: PT_0,
-    top: PT_10,
+    start:  PT_0,
+    end:    PT_0,
+    top:    PT_10,
     bottom: PT_10,
 };
 
@@ -99,7 +101,7 @@ pub struct App {
     #[nwg_events(
         OnMenuOpen: [App::menu_settings],
     )]
-    menu_settings: nwg::Menu,
+    menu_settings:            nwg::Menu,
     #[nwg_control(
         text: "&Lowercase words",
         parent: menu_settings,
@@ -108,7 +110,7 @@ pub struct App {
     #[nwg_events(
         OnMenuItemSelected: [App::menu_settings_lowercase],
     )]
-    menu_settings_lowercase: nwg::MenuItem,
+    menu_settings_lowercase:  nwg::MenuItem,
     #[nwg_control(
         text: "&Hide empty sources",
         parent: menu_settings,
@@ -126,7 +128,7 @@ pub struct App {
     #[nwg_events(
         OnMenuItemSelected: [App::menu_settings_emojis],
     )]
-    menu_settings_emojis: nwg::MenuItem,
+    menu_settings_emojis:     nwg::MenuItem,
     #[nwg_control(
         text: "Show summary with &all words",
         parent: menu_settings,
@@ -135,7 +137,7 @@ pub struct App {
     #[nwg_events(
         OnMenuItemSelected: [App::menu_settings_all_words],
     )]
-    menu_settings_all_words: nwg::MenuItem,
+    menu_settings_all_words:  nwg::MenuItem,
 
     #[nwg_layout(
         parent: window,
@@ -233,10 +235,10 @@ pub struct App {
     last_result_thread: RefCell<Option<flume::Sender<bool>>>,
 
     control_pressed: Arc<AtomicBool>,
-    analyses: RefCell<(Vec<Analysis>, Option<Analysis>)>,
+    analyses:        RefCell<(Vec<Analysis>, Option<Analysis>)>,
 
-    args: RefCell<Args>,
-    pwd: RefCell<PathBuf>,
+    args:        RefCell<Args>,
+    pwd:         RefCell<PathBuf>,
     last_source: RefCell<Vec<AnalyzeSource>>,
 
     dpi: Arc<AtomicU32>,
@@ -250,10 +252,7 @@ impl App {
 
         self.dpi.store(96, Ordering::Relaxed);
         let mut font = nwg::Font::default();
-        let _ = nwg::Font::builder()
-            .size(16)
-            .family("Segoe UI Emoji")
-            .build(&mut font);
+        let _ = nwg::Font::builder().size(16).family("Segoe UI Emoji").build(&mut font);
         self.text.set_font(Some(&font));
         self.status.set_font(Some(&font));
         self.search.set_font(Some(&font));
@@ -290,6 +289,7 @@ impl App {
             }
         }
     }
+
     fn keyrelease(&self, data: &nwg::EventData) {
         if let nwg::EventData::OnKey(key) = data {
             if *key == nwg::keys::CONTROL {
@@ -324,11 +324,7 @@ impl App {
                 return;
             }
             let result = result.unwrap_or_else(|e| "⚠️ ".to_string() + &e.to_string());
-            let _ = tx
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .send(Message::Results((result, search_text)));
+            let _ = tx.borrow().as_ref().unwrap().send(Message::Results((result, search_text)));
         });
     }
 
@@ -347,10 +343,10 @@ impl App {
         let args = self.args.borrow();
         self.menu_settings_lowercase.set_checked(args.lowercase);
         self.menu_settings_hide_empty.set_checked(args.hide_empty);
-        self.menu_settings_all_words
-            .set_checked(args.show_all_words);
+        self.menu_settings_all_words.set_checked(args.show_all_words);
         self.menu_settings_emojis.set_checked(args.emojis);
     }
+
     fn menu_settings_lowercase(&self) {
         {
             let mut args = self.args.borrow_mut();
@@ -359,6 +355,7 @@ impl App {
         let sources = self.last_source.borrow().clone();
         self.start_analyze(sources);
     }
+
     fn menu_settings_hide_empty(&self) {
         {
             let mut args = self.args.borrow_mut();
@@ -367,6 +364,7 @@ impl App {
         let sources = self.last_source.borrow().clone();
         self.start_analyze(sources);
     }
+
     fn menu_settings_all_words(&self) {
         {
             let mut args = self.args.borrow_mut();
@@ -375,6 +373,7 @@ impl App {
         let sources = self.last_source.borrow().clone();
         self.start_analyze(sources);
     }
+
     fn menu_settings_emojis(&self) {
         {
             let mut args = self.args.borrow_mut();
@@ -419,10 +418,7 @@ impl App {
                 let size = (12.0 * ratio).to_int_unchecked();
                 self.dpi.store(x, Ordering::SeqCst);
                 let mut font = nwg::Font::default();
-                let _ = nwg::Font::builder()
-                    .size(size)
-                    .family("Segoe UI Emoji")
-                    .build(&mut font);
+                let _ = nwg::Font::builder().size(size).family("Segoe UI Emoji").build(&mut font);
                 self.status.set_font(Some(&font));
                 self.search.set_font(Some(&font));
                 let _ = self.layout.fit();
@@ -482,28 +478,24 @@ fn main() {
     nwg::init().expect("Failed to init Native Windows GUI");
     let _ = nwg::Font::set_global_family("Segoe UI");
     let mut font = nwg::Font::default();
-    let _ = nwg::Font::builder()
-        .size(16)
-        .family("Segoe UI Emoji")
-        .build(&mut font);
+    let _ = nwg::Font::builder().size(16).family("Segoe UI Emoji").build(&mut font);
     let _ = nwg::Font::set_global_default(Some(font));
 
     let app = App::build_ui(Default::default()).expect("Failed to build UI");
-    app.window
-        .set_text(&(app.window.text() + " " + env!("CARGO_PKG_VERSION")));
+    app.window.set_text(&(app.window.text() + " " + env!("CARGO_PKG_VERSION")));
     let (tx, tr) = flume::unbounded();
     (*app.tx.borrow_mut()) = Some(tx);
     (*app.tr.borrow_mut()) = Some(tr);
     (*app.args.borrow_mut()) = Args {
-        lowercase: false,
-        top_words: 10,
-        bottom_words: 3,
-        recursive: true,
+        lowercase:       false,
+        top_words:       10,
+        bottom_words:    3,
+        recursive:       true,
         follow_symlinks: false,
-        hide_empty: true,
-        outfile: None,
-        emojis: false,
-        show_all_words: true,
+        hide_empty:      true,
+        outfile:         None,
+        emojis:          false,
+        show_all_words:  true,
     };
     (*app.pwd.borrow_mut()) =
         canonicalize(std::env::current_dir().unwrap_or_else(|_| PathBuf::new()))
