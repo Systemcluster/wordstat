@@ -13,32 +13,32 @@ use std::{
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU32, Ordering},
     },
     time::Duration,
 };
 
 use nwd::NwgUi;
 use nwg::{
+    NativeUi,
     stretch::{
         geometry::{Rect, Size},
         style::{AlignItems, AlignSelf, Dimension as D, FlexDirection, JustifyContent},
     },
-    NativeUi,
 };
 
 use winapi::{
     shared::windef::HWND,
     um::{
         shellscalingapi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
-        wincon::{AttachConsole, FreeConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS},
+        wincon::{ATTACH_PARENT_PROCESS, AttachConsole, FreeConsole, GetConsoleWindow},
         winuser::MonitorFromWindow,
     },
 };
 
 use report::*;
-use shared::{analyze, Analysis, AnalyzeSource, Args};
+use shared::{Analysis, AnalyzeSource, Args, analyze};
 
 static ICON: &[u8] = include_bytes!("../../resources/book.ico");
 

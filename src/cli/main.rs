@@ -2,53 +2,53 @@
 mod shared;
 
 use std::{
-    fs::{canonicalize, File},
+    fs::{File, canonicalize},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use clap::{ErrorKind, IntoApp, Parser};
-use console::{style, Emoji};
+use clap::{CommandFactory, Parser, error::ErrorKind};
+use console::{Emoji, style};
 use indicatif::{ProgressBar, ProgressStyle};
 use pathdiff::diff_paths;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use regex::{Regex, RegexBuilder};
 
-use crate::shared::{analyze, Analysis, AnalyzeSource, Args};
+use crate::shared::{Analysis, AnalyzeSource, Args, analyze};
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None)]
 pub struct CliArgs {
     /// Path to one or multiple files or directories of files to analyze
     path:            Vec<String>,
     /// Normalize casing by lowercasing each occuring word
-    #[clap(short, long)]
+    #[arg(short, long)]
     lowercase:       bool,
     /// Number of top words to show per file (0 = all)
-    #[clap(short, long, default_value_t = 10)]
+    #[arg(short, long, default_value_t = 10)]
     top_words:       usize,
     /// Number of least occuring words to show per file
-    #[clap(short, long, default_value_t = 3)]
+    #[arg(short, long, default_value_t = 3)]
     bottom_words:    usize,
     /// Show matching emojis for words
-    #[clap(short, long)]
+    #[arg(short, long)]
     emojis:          bool,
     /// Print combined analysis with all words found in files
-    #[clap(short, long)]
+    #[arg(short, long)]
     show_all_words:  bool,
     /// Filter printed words by string or regex
-    #[clap(short, long)]
+    #[arg(short, long)]
     word_filter:     Option<String>,
     /// Iterate through subdirectories
-    #[clap(short, long)]
+    #[arg(short, long)]
     recursive:       bool,
     /// Follow symlinks
-    #[clap(short, long)]
+    #[arg(short, long)]
     follow_symlinks: bool,
     /// The path to a file that the results will be written to, will overwrite if it already exists
-    #[clap(short, long)]
+    #[arg(short, long)]
     outfile:         Option<String>,
 }
 
@@ -206,7 +206,7 @@ fn print_analysis_file(analysis: &Analysis, path: &Path) {
 
 fn main() {
     let args = CliArgs::parse_from(wild::args());
-    let app = Arc::new(Mutex::new(CliArgs::into_app()));
+    let app = Arc::new(Mutex::new(CliArgs::command()));
 
     let pwd = canonicalize(std::env::current_dir().unwrap_or_else(|error| {
         app.lock().unwrap().error(ErrorKind::Io, format!("{}", error)).exit()

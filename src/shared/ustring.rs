@@ -13,7 +13,7 @@ use std::{
 use bumpalo::Bump;
 use parking_lot::Mutex;
 
-pub use super::uhash::{ahash, IdentityHashMap};
+pub use super::uhash::{IdentityHashMap, ahash};
 
 const BUCKET_COUNT: u64 = 64;
 const BUCKET_BASE_CAPACITY: usize = 0;

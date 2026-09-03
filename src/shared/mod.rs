@@ -105,7 +105,11 @@ async fn process(
     let mut analysis = Analysis {
         file,
         sent_count: content.unicode_sentences().count(),
-        para_count: content.replace("\r\n", "\n").split("\n\n").count(),
+        para_count: if content.is_empty() {
+            0
+        } else {
+            content.replace("\r\n", "\n").split("\n\n").count()
+        },
         char_count: content.graphemes(true).count(),
         ..Default::default()
     };
@@ -133,7 +137,9 @@ async fn process(
         let (word, count) = (item.key(), item.value());
         analysis.word_freq.push((*count, *word));
     });
-    analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
+    analysis.word_freq.sort_by(|(a, word_a), (b, word_b)| {
+        b.cmp(a).then_with(|| word_a.as_str().cmp(word_b.as_str()))
+    });
     analysis.word_freq_map = map;
     analysis.word_uniqs = analysis.word_freq.len();
     update_dists(&mut analysis);
@@ -178,7 +184,7 @@ pub fn analyze<
             AnalyzeSource::Path(path) => {
                 let walk = WalkDir::new(path)
                     .follow_links(args.follow_symlinks)
-                    .max_depth(if args.recursive { std::usize::MAX } else { 1 })
+                    .max_depth(if args.recursive { usize::MAX } else { 1 })
                     .sort_by_file_name();
                 walk.into_iter()
                     .filter_map(|path| {
@@ -253,7 +259,9 @@ pub fn analyze<
             let (word, count) = (item.key(), item.value());
             analysis.word_freq.push((*count, *word))
         });
-        analysis.word_freq.sort_by(|(a, _), (b, _)| b.cmp(a));
+        analysis.word_freq.sort_by(|(a, word_a), (b, word_b)| {
+            b.cmp(a).then_with(|| word_a.as_str().cmp(word_b.as_str()))
+        });
         update_dists(analysis);
     }
 

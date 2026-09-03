@@ -5,7 +5,7 @@ description = "Word Counter and Text Statistics"
 edition = "2021"
 name = "wordstat"
 version = "0.2.0"
-rust-version = "1.70.0"
+rust-version = "1.85.0"
 default-run = "wordstat"
 
 [[bin]]
@@ -52,8 +52,8 @@ opt-level = 3
 anyhow = {version = "1"}
 bumpalo = {version = "3"}
 byteorder = {version = "1"}
-dashmap = {version = "5"}
-emojis = {version = "0.6"}
+dashmap = {version = "6"}
+emojis = {version = "0.9"}
 entangled = {version = "1"}
 futures = {version = "0.3"}
 num_cpus = {version = "1"}
@@ -64,21 +64,21 @@ regex = {version = "1"}
 unicode-segmentation = {version = "1"}
 walkdir = {version = "2"}
 
-clap = {version = "3.2", features = [
+clap = {version = "4", features = [
   "std",
   "color",
   "suggestions",
   "derive",
+  "cargo",
   "env",
-  "regex",
   "unicode",
   "wrap_help",
 ], optional = true}
-console = {version = "0.15", optional = true}
-indicatif = {version = "0.17", optional = true}
-wild = {version = "2.1", optional = true}
+console = {version = "0.16", optional = true}
+indicatif = {version = "0.18", optional = true}
+wild = {version = "2", optional = true}
 
-flume = {version = "0.10", optional = true}
+flume = {version = "0.12", optional = true}
 native-windows-derive = {version = "=1.0.5", optional = true}
 native-windows-gui = {version = "=1.0.12", default-features = false, features = ["all", "high-dpi"], optional = true}
 winapi = {version = "0.3", default-features = false, features = [
@@ -95,8 +95,8 @@ cli = ["wild", "clap", "indicatif", "console"]
 gui = ["native-windows-gui", "native-windows-derive", "flume", "winapi"]
 
 [build-dependencies]
-which = {version = "4"}
-winres = {version = "0.1"}
+which = {version = "8"}
+winresource = {version = "0.1"}
 
 [dev-dependencies]
-glassbench = "0.3"
+glassbench = "0.5"
